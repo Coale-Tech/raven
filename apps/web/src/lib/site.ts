@@ -10,6 +10,9 @@ export const _resetActiveSite = () => { active = null }
 
 export const siteOrigin = (): string => active?.origin ?? window.location.origin
 
+/** The bearer for native requests made outside fetch (plugins); undefined in the browser. */
+export const siteToken = (): string | undefined => active?.getToken()
+
 const isAbsolute = (path: string) => /^(https?:|blob:|data:)/i.test(path)
 
 /** Absolute URL on the active site for a site-relative path; identity in the browser. */

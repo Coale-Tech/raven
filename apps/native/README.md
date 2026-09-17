@@ -85,3 +85,50 @@ Layer 1 of the bundled design: the app boots to a placeholder from `apps/web`.
   are never stamped fresh, so the freshness counter refetches them on reconnect.
 - Offline signal: `navigator.onLine` (`src/stores/connectionState.ts`) drives the banner,
   the pagination guard, and the static edge rows in the stream.
+
+## Native integrations (layer 5)
+
+Page side of the native plugins, in `apps/web/src/native/`. Everything outside that
+directory reaches it behind `import.meta.env.VITE_NATIVE` with a dynamic import, so
+browser builds carry none of it.
+
+- Insets and status bar: the `standalone` Tailwind variant also matches `:root.native`,
+  so the PWA's inset utilities apply in the WebView; the shell root pads
+  `env(safe-area-inset-top)`. Android pads natively in `MainActivity` (its `env()` values
+  are 0). `statusBar.ts` sets the bar style from the theme; `theme.ts` mirrors the theme
+  choice for the native canvas.
+- Push (`push.ts`): one FCM device token, subscribed per site with that site's bearer
+  (`environment: "Mobile"`), stored site-scoped and mirrored in Preferences under
+  `pushToken.<origin>` so removing a site in the picker can unsubscribe it. Foreground
+  pushes are handed to the page (`presentationOptions: []`); ones from another saved site
+  are re-posted through `RavenShell.showNotification`. A tap on the open site's push
+  navigates; on another saved site it sets the default site, stores the path
+  (`pending.ts`), and reloads. The read sweep reads tray entries through the plugin, keyed
+  `<hostname>:<channel_id>`.
+- Share-in (`shareIn.ts`): Android through `RavenShell.getShareIntent`, iOS through
+  send-intent's share extension (manual Xcode step below). Delivered to
+  `/share-target?native=1` on the active site; a share that opens the picker waits until a
+  site opens. Files are read through the filesystem plugin and queued for the composer.
+- Share-out and downloads (`share.ts`, `download.ts`): `RavenDownload` streams the file natively
+  with the bearer into the cache's `media/` folder (no CORS: hosted sites serve public files
+  straight from nginx), with progress and cancel from the toast, then hands it to the share
+  sheet. Completed files are reused and wiped on logout; the folder becomes the shared media
+  cache in layer 6, which brings its budget. Android uses `RavenShell.share` (a plain chooser,
+  Raven excluded): the Share plugin waits for the chooser's result, and a pick of Raven
+  itself relaunches the singleTask activity over the chooser, leaving the plugin "in
+  progress" until a restart. Native labels the actions "Share".
+- Links (`links.ts`): the site's own `/raven/…` links route in the app; any other URL keeps
+  Capacitor's default and opens in the system browser.
+- Android back (`back.ts`): a root page (footer tab or workspace home) goes to the picker
+  with the session kept; deeper pages go one step back.
+- `NativeBridge.tsx`, mounted from `AppListeners`, owns the listeners that need the router.
+- Keyboard: never resizes the page on either platform (iOS `Keyboard.resize: "none"`, Android
+  `adjustPan`), matching the installed iOS PWA; the OS pans a covered field into view.
+- Haptics, badge, drawer: the existing hooks branch to the plugins.
+
+iOS share-in is the `RavenShare` extension target (`ios/App/RavenShare/`): it copies each
+shared item into the app group `group.raven.thecommit.company` and opens
+`raven://?title&description&type&url`, which `SceneDelegate.receiveShare` turns into
+send-intent's `sendIntentReceived` event. Both targets carry the app group entitlement;
+automatic signing registers it on the App IDs on first build.
+

@@ -10,11 +10,10 @@ const config: CapacitorConfig = {
     ios: { contentInset: "never" },
     android: { allowMixedContent: false },
     plugins: {
-        Keyboard: { resize: "native" },
+        // The keyboard never resizes the page: iOS overlays it, Android pans (adjustPan in the manifest).
+        Keyboard: { resize: "none" },
         // Insets are applied natively in MainActivity; the page gets no CSS variables.
         SystemBars: { insetsHandling: "disable" },
-        // Android < 15: lay the page out below the status bar instead of behind it.
-        StatusBar: { overlaysWebView: false },
         // The page hides the splash once rendered; the native timer covers a page that never does.
         SplashScreen: { launchAutoHide: true, launchShowDuration: 8000 },
         // Foreground pushes go to the page; the page re-posts the ones from other sites.

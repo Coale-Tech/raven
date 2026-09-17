@@ -66,10 +66,12 @@ export const isRavenPushConfigured = (): boolean => getBootPushConfig() !== null
  * the toggle until the PWA is installed.
  */
 export const isPushSupportedByBrowser = (): boolean =>
-    "serviceWorker" in navigator && "Notification" in window && "PushManager" in window
+    !!import.meta.env.VITE_NATIVE || ("serviceWorker" in navigator && "Notification" in window && "PushManager" in window)
 
 /** Whether THIS device has push enabled (source of truth: the stored token). */
-export const isPushEnabled = (): boolean => localStorage.getItem(siteKey(TOKEN_STORAGE_KEY)) !== null
+// Same key as NATIVE_TOKEN_KEY in native/push.ts; importing it would pull that module into browser bundles.
+export const isPushEnabled = (): boolean =>
+    localStorage.getItem(siteKey(import.meta.env.VITE_NATIVE ? "raven-native-fcm-token" : TOKEN_STORAGE_KEY)) !== null
 
 /**
  * Running as an INSTALLED app (home screen / desktop PWA) rather than a browser
@@ -181,6 +183,7 @@ const mintAndSyncToken = async (): Promise<void> => {
  * @throws when unsupported/unconfigured or the token/subscribe calls fail.
  */
 export const enablePush = async (): Promise<boolean> => {
+    if (import.meta.env.VITE_NATIVE) return (await import("../native/push")).enableNativePush()
     const permission = await Notification.requestPermission()
     if (permission !== "granted") return false
     await mintAndSyncToken()
@@ -189,6 +192,7 @@ export const enablePush = async (): Promise<boolean> => {
 
 /** Disable push for this device: delete the FCM token + the server record. Best-effort. */
 export const disablePush = async (): Promise<void> => {
+    if (import.meta.env.VITE_NATIVE) return (await import("../native/push")).disableNativePush()
     const token = localStorage.getItem(siteKey(TOKEN_STORAGE_KEY))
     if (!token) return
     // Clear local state first — the device should read "disabled" even if the
@@ -214,8 +218,11 @@ export const disablePush = async (): Promise<void> => {
  * makes a newer notification replace the older one, so there's at most one per
  * conversation. Used to sweep out entries for already-read conversations.
  */
-export const getDeliveredNotifications = async (): Promise<Notification[]> => {
+export type DeliveredNotification = { tag?: string | null; close(): void }
+
+export const getDeliveredNotifications = async (): Promise<DeliveredNotification[]> => {
     try {
+        if (import.meta.env.VITE_NATIVE) return await (await import("../native/push")).getNativeDeliveredNotifications()
         const registration = await swRegistration
         return (await registration?.getNotifications()) ?? []
     } catch {

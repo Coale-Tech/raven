@@ -1,14 +1,17 @@
 import type { ReactNode } from "react"
-import { Download, Link2, LucideIcon, Paperclip } from "lucide-react"
+import { Download, Link2, LucideIcon, Paperclip, Share } from "lucide-react"
 import { toast } from "sonner"
 import _ from "@lib/translate"
 import type { Message } from "@raven/types/common/Message"
 import type { MessageDialog } from "@utils/channelAtoms"
 import { channelMessagesStore } from "@stores/messages/store"
 import { hasFile } from "./fileMessage"
-import { downloadBlob, downloadFile, getAbsoluteFileURL } from "@lib/file"
+import { downloadBlob, downloadFile, downloadLabel, getAbsoluteFileURL } from "@lib/file"
 import { siteFetch } from "@lib/site"
 import { getFileName } from "@raven/lib/utils/operations"
+
+// Native hands files to the share sheet.
+const DownloadIcon = import.meta.env.VITE_NATIVE ? Share : Download
 
 export type MessageAction = {
     id: string
@@ -85,8 +88,8 @@ export const buildFileActions = (
 
         actions.push({
             id: "download",
-            label: _("Download"),
-            icon: Download,
+            label: downloadLabel(),
+            icon: DownloadIcon,
             // A plain anchor download on EVERY platform, mobile included. Routing mobile
             // through the Web Share sheet was the original design, on the belief that iOS
             // ignores the `download` attribute — but it fails in a phone PWA for a
@@ -109,13 +112,15 @@ export const buildFileActions = (
     if (fileMessages.length > 1) {
         actions.push({
             id: "download-all",
-            label: _("Download all ({0})", [`${fileMessages.length}`]),
-            icon: Download,
+            label: import.meta.env.VITE_NATIVE ? _("Share all ({0})", [`${fileMessages.length}`]) : _("Download all ({0})", [`${fileMessages.length}`]),
+            icon: DownloadIcon,
             onSelect: () => {
                 const ids = fileMessages.map((fileMessage) => fileMessage.name)
                 const endpoint = `/api/method/raven.api.raven_message.download_batch_files?message_ids=${encodeURIComponent(
                     JSON.stringify(ids),
                 )}`
+                // Native: the zip goes to the share sheet like a single file.
+                if (import.meta.env.VITE_NATIVE) { downloadFile(endpoint, "raven-files.zip"); return }
                 siteFetch(endpoint)
                     .then(async (response) => {
                         if (!response.ok) throw new Error(String(response.status))

@@ -1,3 +1,4 @@
+import { withPrefs } from "./platform"
 import { versionAtLeast } from "./version"
 
 export type Site = {
@@ -14,12 +15,16 @@ export type Site = {
 const SITES_KEY = "sites"
 const DEFAULT_SITE_KEY = "defaultSite"
 
+// A bench or LAN site has no certificate; everything else gets https unless typed otherwise.
+const isLocalHost = (host: string) => /^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(host)
+
 export const normalizeSiteUrl = (input: string): string | null => {
     const trimmed = input.trim()
     if (!trimmed) return null
-    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
     try {
-        return new URL(withScheme).origin
+        if (/^https?:\/\//i.test(trimmed)) return new URL(trimmed).origin
+        const url = new URL(`https://${trimmed}`)
+        return isLocalHost(url.hostname) ? `http://${url.host}` : url.origin
     } catch {
         return null
     }
@@ -65,10 +70,6 @@ export const probeSite = async (url: string, appVersion: string, getJson: GetJso
         },
     }
 }
-
-// The plugin proxy must never be a promise's value: resolving it calls its `then`.
-const withPrefs = <T,>(fn: (p: typeof import("@capacitor/preferences").Preferences) => Promise<T>): Promise<T> =>
-    import("@capacitor/preferences").then(({ Preferences }) => fn(Preferences))
 
 export const loadSites = async (): Promise<Site[]> => {
     const { value } = await withPrefs((p) => p.get({ key: SITES_KEY }))

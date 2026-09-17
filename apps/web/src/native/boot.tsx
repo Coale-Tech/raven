@@ -9,6 +9,7 @@ import { onRequestError, setSessionLostHandler, setTokenRefreshedHandler, startS
 import { getDefaultSite, loadSites, setDefaultSite } from "./sites"
 import { SitePicker } from "./SitePicker"
 import { hideNativeSplash } from "./splash"
+import { initNativePush } from "./push"
 
 const render = (node: ReactNode) => {
     createRoot(document.getElementById("root")!).render(
@@ -19,12 +20,19 @@ const render = (node: ReactNode) => {
     hideNativeSplash()
 }
 
+// A share that opened the picker waits until a site opens; the bridge then follows the pending path.
+const stashColdShare = async () => {
+    const [{ stashIncomingShare, SHARE_TARGET_PATH }, { setPendingPath }] = await Promise.all([import("./shareIn"), import("./pending")])
+    if (await stashIncomingShare()) await setPendingPath(SHARE_TARGET_PATH)
+}
+
 const toPicker = () => { setDefaultSite(null).finally(() => window.location.replace("/")) }
 
 // Same rule as the sdk: the site origin, with the port swapped for a bench's socket port.
+// Only a plain-http site is a bench; hosted sites proxy socket.io on their own origin.
 const socketUrl = (origin: string) => {
     const url = new URL(origin)
-    if (import.meta.env.VITE_SOCKET_PORT) url.port = import.meta.env.VITE_SOCKET_PORT
+    if (import.meta.env.VITE_SOCKET_PORT && url.protocol === "http:") url.port = import.meta.env.VITE_SOCKET_PORT
     return url.origin
 }
 
@@ -36,7 +44,10 @@ export const bootNative = async () => {
     const url = await getDefaultSite()
     const site = url ? (await loadSites()).find((s) => s.url === url) : undefined
     const session = site ? await startSession(site) : null
-    if (!session) return render(<SitePicker />)
+    if (!session) {
+        await stashColdShare()
+        return render(<SitePicker />)
+    }
     // Storage keys and URLs are scoped from here on; boot needs the token.
     setActiveSite(session.site.url, session.getToken)
     if (!(await loadBoot())) return toPicker()
@@ -46,4 +57,5 @@ export const bootNative = async () => {
     setTokenRefreshedHandler((token) => socket.setToken(token))
     socket.start().catch(() => { })
     render(<App native={{ url: session.site.url, siteName: session.site.sitename, getToken: session.getToken, onRequestError, socket: socket as unknown as FrappeConfig["socket"] }} />)
+    initNativePush()
 }

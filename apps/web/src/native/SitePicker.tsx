@@ -5,6 +5,7 @@ import { Input } from "@components/ui/input"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@components/ui/alert-dialog"
 import _ from "@lib/translate"
 import { signIn, signOut, tokenStore } from "./auth"
+import { unsubscribeSitePush } from "./push"
 import { forgetSite, loadSites, normalizeSiteUrl, probeSite, saveSite, setDefaultSite, type ProbeResult, type Site } from "./sites"
 
 const probeMessage = (result: Exclude<ProbeResult, { site: Site }>) => ({
@@ -62,13 +63,15 @@ export const SitePicker = () => {
 
     const remove = (site: Site) => run(site.url, async () => {
         setRemoving(null)
+        // Before the revoke: the unsubscribe needs a bearer for that site.
+        await unsubscribeSitePush(site)
         await signOut(site.url)
         await forgetSite(site.url)
         setSites(await loadSites())
     })
 
     return (
-        <main className="min-h-dvh bg-surface-white text-ink-gray-9 flex flex-col gap-6 px-5 pt-16 pb-8 max-w-md mx-auto w-full">
+        <main className="min-h-dvh bg-surface-white text-ink-gray-9 flex flex-col gap-6 px-5 pt-[calc(env(safe-area-inset-top)+3rem)] pb-8 max-w-md mx-auto w-full">
             <h1 className="text-3xl font-semibold">raven</h1>
             {sites.length > 0 && (
                 <section className="flex flex-col gap-2">
@@ -95,7 +98,7 @@ export const SitePicker = () => {
             )}
             <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); addSite() }}>
                 <label htmlFor="site-url" className="text-sm text-ink-gray-6">{_("Site URL")}</label>
-                {/* type="text": a type="url" input rejects a bare host; normalizeSiteUrl adds https. */}
+                {/* type="text": a type="url" input rejects a bare host; normalizeSiteUrl adds the scheme. */}
                 <Input id="site-url" type="text" inputMode="url" placeholder="raven.frappe.cloud" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     value={url} onChange={(e) => setUrl(e.target.value)} />
                 <Button type="submit" variant="solid" size="lg" loading={busy === "add"} loadingText={_("Connecting…")}>{_("Add site")}</Button>

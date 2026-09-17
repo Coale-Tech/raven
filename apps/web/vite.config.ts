@@ -68,6 +68,12 @@ return {
       "prosemirror-transform",
     ],
     alias: {
+      // Native has no site under its origin: index.css's font URLs point at bundled copies instead
+      // (Inter from the frappe app, OFL; Newsreader from raven/public).
+      ...(native ? {
+        "/assets/frappe/css/fonts/inter": path.resolve(__dirname, "./src/fonts/inter"),
+        "/assets/raven/fonts": path.resolve(__dirname, "../../raven/public/fonts"),
+      } : {}),
       "@": path.resolve(__dirname, "./src"),
       "@lib": path.resolve(__dirname, "./src/lib"),
       "@components": path.resolve(__dirname, "./src/components"),

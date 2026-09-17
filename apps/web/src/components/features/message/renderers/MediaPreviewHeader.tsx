@@ -1,4 +1,4 @@
-import { ArrowDownToLineIcon, Share2, X } from "lucide-react"
+import { ArrowDownToLineIcon, Share, Share2, X } from "lucide-react"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@components/ui/tooltip"
@@ -6,6 +6,7 @@ import { UserAvatar } from "../UserAvatar"
 import { useMessageTimes } from "./MessageRow"
 import { formatRelativeDate } from "@lib/date"
 import _ from "@lib/translate"
+import { downloadLabel } from "@lib/file"
 import type { UserData } from "@db"
 
 /**
@@ -94,11 +95,11 @@ export const MediaPreviewHeader = ({
                         variant="ghost"
                         size="md"
                         isIconButton
-                        title={_("Download")}
-                        aria-label={_("Download")}
+                        title={downloadLabel()}
+                        aria-label={downloadLabel()}
                         onClick={onDownload}
                     >
-                        <ArrowDownToLineIcon />
+                        {import.meta.env.VITE_NATIVE ? <Share /> : <ArrowDownToLineIcon />}
                     </Button>
                 )}
                 {onShare && (

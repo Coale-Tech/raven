@@ -3,7 +3,9 @@ import { Drawer as DrawerPrimitive } from "vaul"
 import { cn } from "@lib/utils"
 
 function Drawer({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-    return <DrawerPrimitive.Root data-slot="drawer" {...props} />
+    // vaul's Safari-toolbar fix (body position:fixed on open) shifts the whole app in a WebView.
+    // vaul only skips it for installed PWAs (display-mode:standalone); this skips it for the WebView too.
+    return <DrawerPrimitive.Root data-slot="drawer" noBodyStyles={!!import.meta.env.VITE_NATIVE} {...props} />
 }
 
 /**

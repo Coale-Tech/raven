@@ -8,7 +8,6 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import io.socket.client.IO;
-import io.socket.client.Manager;
 import io.socket.client.Socket;
 import java.net.URI;
 import java.util.Arrays;
@@ -28,6 +27,7 @@ public class RavenSocketPlugin extends Plugin {
     private String origin = "";
     private String siteName = "";
     private String connectedTarget = "";
+    private boolean hasConnected = false;
 
     @PluginMethod
     public void connect(PluginCall call) {
@@ -37,31 +37,36 @@ public class RavenSocketPlugin extends Plugin {
             return;
         }
         String target = url + "/" + call.getString("namespace", "") + "@" + call.getString("origin", "");
-        // Same target while a connection is live or pending: the client's connect() is a no-op then.
-        // A page loaded after the socket came up still needs the connect event to flush its emits.
+        // Same target: a live socket only re-sends the connect event (a page loaded after it came up
+        // needs that to flush its emits); a dead one restarts now instead of waiting out the backoff.
         if (socket != null && target.equals(connectedTarget)) {
             options.extraHeaders = headers(call.getString("token", ""));
             if (socket.connected()) notifyListeners("connect", new JSObject());
-            else socket.connect();
+            else { socket.disconnect(); socket.connect(); }
             call.resolve();
             return;
         }
         close();
         connectedTarget = target;
+        hasConnected = false;
         origin = call.getString("origin", "");
         siteName = call.getString("namespace", "");
         options = new IO.Options();
         options.transports = new String[] { "websocket" };
         options.extraHeaders = headers(call.getString("token", ""));
         socket = IO.socket(URI.create(url + "/" + siteName), options);
-        socket.on(Socket.EVENT_CONNECT, args -> notifyListeners("connect", new JSObject()));
-        socket.on(Socket.EVENT_DISCONNECT, args -> notifyListeners("disconnect", new JSObject()));
+        socket.on(Socket.EVENT_CONNECT, args -> {
+            notifyListeners("connect", new JSObject());
+            // Any connect after the first is a reconnect to the page, the forced restart included.
+            if (hasConnected) notifyListeners("reconnect", new JSObject());
+            hasConnected = true;
+        });
+        socket.on(Socket.EVENT_DISCONNECT, args -> notifyListeners("disconnect", new JSObject().put("reason", args.length > 0 ? String.valueOf(args[0]) : "")));
         socket.on(Socket.EVENT_CONNECT_ERROR, args -> {
             String message = args.length > 0 ? String.valueOf(args[0]) : "";
             Logger.warn("RavenSocket: connect error: " + message);
             notifyListeners("connect_error", new JSObject().put("message", message));
         });
-        socket.io().on(Manager.EVENT_RECONNECT, args -> notifyListeners("reconnect", new JSObject()));
         socket.onAnyIncoming(args -> {
             JSObject payload = new JSObject();
             payload.put("event", String.valueOf(args[0]));

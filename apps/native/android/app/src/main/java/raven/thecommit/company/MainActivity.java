@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(RavenShellPlugin.class);
         registerPlugin(RavenSocketPlugin.class);
+        registerPlugin(RavenDownloadPlugin.class);
         // A share or notification tap only ever arrives as a fresh launch or onNewIntent.
         // A recreated activity (process death, Recents) gets the task's root intent
         // again; drop it, or the share or tap the user already acted on replays.
@@ -27,16 +28,14 @@ public class MainActivity extends BridgeActivity {
     }
 
     // Edge-to-edge (Android 15+): keep the page inside the status and gesture
-    // bars from here, so the page needs no inset CSS. A visible keyboard
-    // replaces the bottom bar inset.
+    // bars from here, so the page needs no inset CSS. The keyboard never
+    // resizes the page (adjustPan in the manifest); the OS pans to a covered field.
     private void applySystemBarInsets() {
         View host = (View) getBridge().getWebView().getParent();
         int bars = WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout();
         ViewCompat.setOnApplyWindowInsetsListener(host, (v, insets) -> {
             Insets bar = insets.getInsets(bars);
-            boolean keyboard = insets.isVisible(WindowInsetsCompat.Type.ime());
-            int bottom = keyboard ? insets.getInsets(WindowInsetsCompat.Type.ime()).bottom : bar.bottom;
-            v.setPadding(bar.left, bar.top, bar.right, bottom);
+            v.setPadding(bar.left, bar.top, bar.right, bar.bottom);
             return new WindowInsetsCompat.Builder(insets).setInsets(bars, Insets.NONE).build();
         });
     }

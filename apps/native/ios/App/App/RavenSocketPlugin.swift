@@ -28,12 +28,12 @@ public class RavenSocketPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         let target = urlString + "/" + (call.getString("namespace") ?? "") + "@" + (call.getString("origin") ?? "")
-        // Same target while a connection is live or pending: only a dead socket is dialed again.
-        // A page loaded after the socket came up still needs the connect event to flush its emits.
+        // Same target: a live socket only re-sends the connect event (a page loaded after it came up
+        // needs that to flush its emits); a dead one restarts now instead of waiting out the backoff.
         if let socket = socket, target == connectedTarget {
             manager?.setConfigs([.extraHeaders(headers(call.getString("token") ?? ""))])
             if socket.status == .connected { notifyListeners("connect", data: [:]) }
-            else if socket.status != .connecting { socket.connect() }
+            else { manager?.disconnect(); socket.connect() }
             call.resolve()
             return
         }
@@ -42,7 +42,8 @@ public class RavenSocketPlugin: CAPPlugin, CAPBridgedPlugin {
         hasConnected = false
         origin = call.getString("origin") ?? ""
         siteName = call.getString("namespace") ?? ""
-        let manager = SocketManager(socketURL: url, config: [.log(false), .forceWebsockets(true), .extraHeaders(headers(call.getString("token") ?? ""))])
+        // Default reconnect waits (10 s, growing to 30 s) outlive the page's health check after a background.
+        let manager = SocketManager(socketURL: url, config: [.log(false), .forceWebsockets(true), .reconnectWait(1), .reconnectWaitMax(5), .extraHeaders(headers(call.getString("token") ?? ""))])
         let socket = manager.socket(forNamespace: "/" + siteName)
         socket.on(clientEvent: .connect) { [weak self] _, _ in
             guard let self = self else { return }
@@ -51,7 +52,7 @@ public class RavenSocketPlugin: CAPPlugin, CAPBridgedPlugin {
             if self.hasConnected { self.notifyListeners("reconnect", data: [:]) }
             self.hasConnected = true
         }
-        socket.on(clientEvent: .disconnect) { [weak self] _, _ in self?.notifyListeners("disconnect", data: [:]) }
+        socket.on(clientEvent: .disconnect) { [weak self] data, _ in self?.notifyListeners("disconnect", data: ["reason": "\(data.first ?? "")"]) }
         socket.on(clientEvent: .error) { [weak self] data, _ in
             CAPLog.print("RavenSocket: connect error: \(data)")
             self?.notifyListeners("connect_error", data: ["message": "\(data)"])

@@ -45,6 +45,13 @@ describe("normalizeSiteUrl", () => {
     it("keeps explicit http and lowercases the host", () => {
         expect(normalizeSiteUrl("http://LocalHost:8000")).toBe("http://localhost:8000")
     })
+    it("defaults loopback and private hosts to http, public ones to https", () => {
+        expect(normalizeSiteUrl("127.0.0.1:8004")).toBe("http://127.0.0.1:8004")
+        expect(normalizeSiteUrl("192.168.0.112:8004")).toBe("http://192.168.0.112:8004")
+        expect(normalizeSiteUrl("localhost")).toBe("http://localhost")
+        expect(normalizeSiteUrl("raven.test")).toBe("https://raven.test")
+        expect(normalizeSiteUrl("https://127.0.0.1")).toBe("https://127.0.0.1")
+    })
     it("returns null for garbage", () => {
         expect(normalizeSiteUrl("not a url")).toBeNull()
         expect(normalizeSiteUrl("")).toBeNull()

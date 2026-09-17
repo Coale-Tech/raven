@@ -58,6 +58,9 @@ export class NativeSocket {
         await plugin.addListener("reconnect", () => dispatch(this.managerHandlers, "reconnect", []))
         await plugin.addListener("event", ({ event, args }) => { if (event) dispatch(this.handlers, event, args ?? []) })
         await plugin.connect({ ...this.target, token: this.token() })
+        // A background drops the socket; on return, dial again at once rather than after the client's backoff.
+        const { App } = await import("@capacitor/app")
+        await App.addListener("appStateChange", ({ isActive }) => { if (isActive && !this.connected) this.connect() })
     }
 
     on(event: string, handler: Handler) { add(this.handlers, event, handler); return this }

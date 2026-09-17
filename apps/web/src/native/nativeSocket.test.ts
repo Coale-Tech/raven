@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
 import { NativeSocket, type RavenSocketPlugin } from "./nativeSocket"
 
+vi.mock("@capacitor/app", () => ({ App: { addListener: async () => ({ remove: async () => { } }) } }))
+
 const makePlugin = () => {
     const listeners = new Map<string, (payload: { event?: string; args?: unknown[] }) => void>()
     const plugin = {

@@ -18,8 +18,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Shell plugin for the bundled Raven page (contract: packages/lib/utils/ravenShell.ts):
- * foreground notifications for other saved sites and OS share-sheet intake.
+ * Shell plugin for the bundled Raven page (contract: apps/web/src/native/shell.ts):
+ * foreground notifications for other saved sites, share-out chooser and share intake.
  */
 @CapacitorPlugin(name = "RavenShell")
 public class RavenShellPlugin extends Plugin {
@@ -34,6 +34,15 @@ public class RavenShellPlugin extends Plugin {
             ConversationNotification.post(getContext(), call.getData());
             call.resolve();
         }).start();
+    }
+
+    // ---- share out ----------------------------------------------------------------
+    // Own chooser so Raven can be excluded from it (the Share plugin cannot), and no
+    // result tracking, so nothing is left "in progress" if the chooser never reports back.
+    @PluginMethod
+    public void share(PluginCall call) {
+        getActivity().startActivity(ShareOut.chooser(getContext(), call.getData()));
+        call.resolve();
     }
 
     // ---- share intents ----------------------------------------------------------

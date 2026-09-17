@@ -1,4 +1,8 @@
 import { siteFetch, siteOrigin } from '@lib/site'
+import _ from '@lib/translate'
+
+/** Native hands files to the share sheet, so the action is named for what it does. */
+export const downloadLabel = () => (import.meta.env.VITE_NATIVE ? _("Share") : _("Download"))
 /**
  * Function to return extension of a file
  * @param filename name of the file with extension
@@ -82,6 +86,11 @@ export const getAbsoluteFileURL = (fileURL: string, origin: string = siteOrigin(
 
 /** Triggers a browser download of a (session-authenticated) file URL. */
 export const downloadFile = (url: string, fileName?: string) => {
+    // WebView has no download manager; hand the file to the OS share sheet instead.
+    if (import.meta.env.VITE_NATIVE) {
+        void import('../native/share').then(({ shareFileNative }) => shareFileNative(getAbsoluteFileURL(url), fileName || url.split("/").pop() || "file"))
+        return
+    }
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = fileName || ''
@@ -148,6 +157,12 @@ const attemptShare = async (data: ShareData): Promise<boolean> => {
  */
 export const shareFile = async (fileUrl: string, fileName: string): Promise<'shared' | 'copied' | 'failed'> => {
     const url = getAbsoluteFileURL(fileUrl)
+
+    if (import.meta.env.VITE_NATIVE) {
+        const { shareFileNative } = await import('../native/share')
+        // A dismissed sheet is not an error — stay silent like a completed share.
+        return (await shareFileNative(url, fileName)) === 'failed' ? 'failed' : 'shared'
+    }
 
     const file = await fetchAsFile(url, fileName)
     if (file && navigator.canShare?.({ files: [file] })) {

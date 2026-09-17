@@ -16,7 +16,7 @@ import { SwipeDownToClose } from "./SwipeDownToClose"
 import { AudioPlayer } from "./AudioPlayer"
 import { useUser } from "@hooks/useUser"
 import { useIsMobile } from "@hooks/use-mobile"
-import { downloadFile, getFileExtension, shareFile } from "@lib/file"
+import { downloadFile, downloadLabel, getFileExtension, shareFile } from "@lib/file"
 import { formatBytes } from "@raven/lib/utils/operations"
 import { cn } from "@lib/utils"
 import _ from "@lib/translate"
@@ -243,7 +243,7 @@ const AttachmentPreviewContent = ({
                 Desktop keeps the in-flow row (the PDF embed needs its reserved
                 space). */}
             <div ref={setHeaderEl} className={cn(
-                "shrink-0 p-3 transition-opacity duration-150 max-md:absolute max-md:inset-x-0 max-md:top-0 max-md:z-20",
+                "shrink-0 p-3 transition-opacity duration-150 max-md:absolute max-md:inset-x-0 max-md:top-0 max-md:z-20 standalone:max-md:pt-[calc(0.75rem+env(safe-area-inset-top))]",
                 chromeHidden && "pointer-events-none opacity-0",
             )}>
                 <MediaPreviewHeader
@@ -551,7 +551,8 @@ StripItem.displayName = "StripItem"
  * the surrounding backdrop still does.
  */
 const DownloadCard = ({ attachment, isMobile }: { attachment: Attachment; isMobile: boolean }) => {
-    const openInTab = isMobile && attachment.kind === "pdf"
+    // Native has no tab and no session in the browser; the share sheet takes the PDF too.
+    const openInTab = isMobile && attachment.kind === "pdf" && !import.meta.env.VITE_NATIVE
     const action = () =>
         openInTab
             ? window.open(attachment.fileUrl, "_blank", "noopener")
@@ -568,7 +569,7 @@ const DownloadCard = ({ attachment, isMobile }: { attachment: Attachment; isMobi
                 <p className="text-sm text-ink-gray-5">{_("No preview available")}</p>
             </div>
             <Button variant="solid" theme="gray" onClick={action}>
-                {openInTab ? _("Open") : _("Download")}
+                {openInTab ? _("Open") : downloadLabel()}
             </Button>
         </div>
     )

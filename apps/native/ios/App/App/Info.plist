@@ -30,6 +30,14 @@
 				<string>raven.thecommit.company</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>raven.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>raven</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>

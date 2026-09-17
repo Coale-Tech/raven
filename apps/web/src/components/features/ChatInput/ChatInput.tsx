@@ -13,6 +13,7 @@ import { EmojiPickerButton } from "./EmojiPickerButton"
 import { CreatePollDialog } from "./CreatePollDialog"
 import { uploadedFilesAtom, uploadingFilesAtom, pendingSendAtom, useAttachFile } from "./useFileInput"
 import { registerComposerFocus } from "./composerFocus"
+import { consumeSharedFiles } from "./sharedFiles"
 import { useRavenEditor, EDITOR_MIN_H } from "@components/features/editor/useRavenEditor"
 import { useQuietSendMode } from "@hooks/useQuietHours"
 import { linkifyBeforeSend } from "@components/features/editor/linkifyOnSend"
@@ -99,6 +100,11 @@ const ChatInput = forwardRef<HTMLFormElement, ChatInputProps>(({ channelID, isDi
         setLinkSignal((n) => n + 1)
     }
     const onAddFile = useAttachFile(channelID)
+    // Files from an OS share, queued by ShareTarget for the channel the user picked.
+    useEffect(() => {
+        const files = consumeSharedFiles()
+        if (files.length) onAddFile(files)
+    }, [channelID])
     const filesRef = useRef<(files: File[]) => void>(() => { })
     filesRef.current = onAddFile
     // Escape / Backspace-when-empty cancel the active reply (reads the latest replyTo).
@@ -416,8 +422,9 @@ const ChatInput = forwardRef<HTMLFormElement, ChatInputProps>(({ channelID, isDi
                             // Android Chrome reports 0 (content doesn't extend under the nav bar),
                             // which left the composer flush against the screen bottom. Keyboard
                             // open → no override: the row's own py-2 gives a little breathing
-                            // room above the keyboard.
-                            <div className={cn("flex items-end gap-0 pe-2 ps-1 py-2 border-t border-outline-gray-2 bg-surface-base", isMobile && !keyboardOpen && "standalone:pb-[max(env(safe-area-inset-bottom),0.75rem)]")}>
+                            // room above the keyboard. Native never resizes the page for the
+                            // keyboard: --keyboard-height (set by the keyboard plugin) lifts the row.
+                            <div className={cn("flex items-end gap-0 pe-2 ps-1 py-2 border-t border-outline-gray-2 bg-surface-base mb-[var(--keyboard-height,0px)]", isMobile && !keyboardOpen && "standalone:pb-[max(env(safe-area-inset-bottom),0.75rem)]")}>
                                 <div className="flex items-center justify-center h-10">
                                     <MobileComposerActions channelID={channelID} />
                                 </div>

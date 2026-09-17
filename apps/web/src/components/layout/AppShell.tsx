@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { lazy, Suspense, useEffect } from "react"
 import { MainPageSkeleton } from "@components/features/main-page/MainPageSkeleton"
 import { isLoggedIn } from "@lib/sessionUser"
 import { Alert, AlertDescription, AlertTitle } from "@components/ui/alert"
@@ -147,6 +147,9 @@ const BootUnavailableScreen = () => {
     )
 }
 
+// Native only: the ternary keeps the chunk out of browser builds entirely.
+const NativeBridge = import.meta.env.VITE_NATIVE ? lazy(() => import("../../native/NativeBridge")) : () => null
+
 const AppListeners = ({ children }: { children: React.ReactNode }) => {
 
     const isReady = useLoadUsers()
@@ -212,6 +215,7 @@ const AppListeners = ({ children }: { children: React.ReactNode }) => {
 
     return <>
         <DocumentTitle />
+        {import.meta.env.VITE_NATIVE && <Suspense fallback={null}><NativeBridge /></Suspense>}
         {children}
         <CommandMenu />
         <AttachmentPreviewModal />
@@ -231,7 +235,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     )
 
     if (isMobile) {
-        return <div className="flex h-dvh flex-col overflow-hidden">
+        return <div className="flex h-dvh flex-col overflow-hidden standalone:pt-[env(safe-area-inset-top)]">
             {banner}
             {children}
         </div>
@@ -240,7 +244,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     return <div className="flex h-dvh overflow-hidden bg-surface-elevation-1">
         <PrimarySidebar />
         <RavenSettingsDialog />
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-w-0 flex-1 flex-col standalone:pt-[env(safe-area-inset-top)]">
             {banner}
             {children}
         </main>

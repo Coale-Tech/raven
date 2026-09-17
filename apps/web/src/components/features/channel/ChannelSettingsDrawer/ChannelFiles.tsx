@@ -324,15 +324,13 @@ const FileListRow = memo(({ file, member, index, onOpen }: {
                 )}
             </div>
 
-            {/* Download is its own control — don't let it open the preview.
-                Hover-revealed on desktop, always visible on mobile (no hover
-                there). */}
+            {/* Desktop only, hover-revealed: on mobile the viewer's own action covers it. */}
             <a
                 href={file.internal_link}
                 download
                 onClick={(event) => event.stopPropagation()}
                 aria-label={_("Download {0}", [file.title])}
-                className="shrink-0 rounded p-1.5 text-ink-gray-4 transition-opacity hover:text-ink-gray-8 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                className="hidden shrink-0 rounded p-1.5 text-ink-gray-4 transition-opacity hover:text-ink-gray-8 md:block md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
             >
                 <ArrowDownToLine className="h-4 w-4" />
             </a>

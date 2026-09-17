@@ -36,7 +36,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@custom-variant standalone (@media (display-mode: standalone));
+@custom-variant standalone {
+  @media (display-mode: standalone) { @slot }
+  :root.native & { @slot }
+}
 
 /* Reading/content tier for names + list-row labels: larger on mobile (15px) than
    desktop (13px), built ONLY from existing Espresso tokens (no --text-* overrides).

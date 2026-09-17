@@ -7,6 +7,7 @@ class RavenBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(RavenShellPlugin())
         bridge?.registerPluginInstance(RavenSocketPlugin())
+        bridge?.registerPluginInstance(RavenDownloadPlugin())
     }
 
     override func viewDidLoad() {

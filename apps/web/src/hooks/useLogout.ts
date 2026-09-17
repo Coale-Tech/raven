@@ -100,6 +100,8 @@ export function useLogout(): { logout: () => Promise<void>; isLoggingOut: boolea
             clearSessionUser()
             clearLocalStorage()
             await clearIndexedDB()
+            await import("../native/download").then((m) => m.clearMediaCache())
+            await import("../native/badge").then((m) => m.setNativeBadge(0))
             window.location.replace("/")
             return
         }
