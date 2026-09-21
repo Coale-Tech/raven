@@ -124,7 +124,7 @@ is none or it fails to load.
 
 - `connecting`: not a failure. Boot waits on the network before anything renders: the token
   refresh, the boot request and the status fallback each give up after 8 s. When boot runs
-  past 3 s, `boot.tsx` shows "Connecting to <host>" with Switch site, so a site that does not
+  past 6 s, `boot.tsx` shows "Connecting to <host>" with Switch site, so a site that does not
   answer never leaves a screen with nothing to tap. The real result replaces it.
 - `offline`: no answer, no cached boot, and the device has no network. "You're offline",
   Retry, Switch site; reloads by itself when the network returns.

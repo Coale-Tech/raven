@@ -13,8 +13,8 @@ import { hideNativeSplash } from "./splash"
 import { initNativePush } from "./push"
 
 // A site that does not answer holds boot for its timeouts. Past this the page says so and
-// offers the way out, where it would otherwise show nothing to tap.
-const SLOW_BOOT_MS = 3000
+// offers the way out. Longer than a healthy open on a slow network, shorter than the first timeout.
+const SLOW_BOOT_MS = 6000
 let slowBoot: ReturnType<typeof setTimeout> | undefined
 let root: Root | undefined
 const render = (node: ReactNode) => {
