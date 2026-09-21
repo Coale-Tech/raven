@@ -13,6 +13,13 @@ vi.mock("@capacitor/preferences", () => ({
 
 describe("pending values", () => {
     beforeEach(() => prefs.clear())
+    it("peek reads the value and leaves it for the take that follows", async () => {
+        await pendingPath.set("/share-target?native=1")
+        expect(await pendingPath.peek()).toBe("/share-target?native=1")
+        expect(await pendingPath.peek()).toBe("/share-target?native=1")
+        expect(await pendingPath.take()).toBe("/share-target?native=1")
+        expect(await pendingPath.peek()).toBeNull()
+    })
     it("takes a value once", async () => {
         await pendingPath.set("/x")
         expect(await pendingPath.take()).toBe("/x")

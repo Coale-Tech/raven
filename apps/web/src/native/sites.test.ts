@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { forgetSite, getDefaultSite, loadSites, normalizeSiteUrl, probeSite, refreshSite, saveSite, setDefaultSite, wipeSiteData, type Site } from "./sites"
+import { completeSite, forgetSite, getDefaultSite, loadSites, normalizeSiteUrl, probeSite, refreshSite, saveSite, setDefaultSite, wipeSiteData, type Site } from "./sites"
 
 const { prefs } = vi.hoisted(() => ({ prefs: new Map<string, string>() }))
 vi.mock("@capacitor/preferences", () => ({
@@ -98,6 +98,29 @@ describe("refreshSite", () => {
         const getJson = async () => ({ status: 200, data: { message: { client_id: "C", raven_version: "3.1.0", sitename: "a.com", app_name: "Acme", logo: "/assets/raven/raven_logo.svg" } } })
         await refreshSite(old, getJson)
         expect((await loadSites())[0]).toMatchObject({ url: "https://a.com", name: "Acme", logo: "/assets/raven/raven_logo.svg", ravenVersion: "3.1.0" })
+    })
+})
+
+describe("completeSite", () => {
+    const handshake = (url: string) => async () => ({ status: 200, url: `${url}/api/method/raven.api.native.handshake`, data: { message: { sitename: "a.com", raven_version: "3.0.0", client_id: "C", app_name: "A" } } })
+
+    it("forgets the old entry and its default when the site now answers from another origin", async () => {
+        prefs.clear()
+        const old = { url: "https://a.com", name: "A" } as Site
+        await saveSite(old)
+        await setDefaultSite(old.url)
+        const result = await completeSite(old, handshake("https://www.a.com"))
+        expect("site" in result && result.site.url).toBe("https://www.a.com")
+        expect((await loadSites()).map((s) => s.url)).toEqual([])
+        expect(await getDefaultSite()).toBeNull()
+    })
+    it("leaves the entry alone when the origin is unchanged or the probe fails", async () => {
+        prefs.clear()
+        const old = { url: "https://a.com", name: "A" } as Site
+        await saveSite(old)
+        await completeSite(old, handshake("https://a.com"))
+        await completeSite(old, async () => { throw new Error("offline") })
+        expect((await loadSites()).map((s) => s.url)).toEqual(["https://a.com"])
     })
 })
 

@@ -100,6 +100,14 @@ export const forgetSite = async (url: string) => {
 }
 
 /** Re-probes an open site and saves what changed; a guest call, so nothing is lost when it fails. */
+/** Completes a record saved without the handshake fields, as the shell app's are: it shares this app's id and storage. */
+export const completeSite = async (site: Site, getJson: GetJson = nativeGetJson): Promise<ProbeResult> => {
+    const result = await probeSite(site.url, getJson)
+    // A site that answers from another origin (apex → www) is saved under it; the entry it was opened from would be a second row.
+    if ("site" in result && result.site.url !== site.url) await forgetSite(site.url)
+    return result
+}
+
 export const refreshSite = async (site: Site, getJson: GetJson = nativeGetJson) => {
     const result = await probeSite(site.url, getJson)
     if ("error" in result) return

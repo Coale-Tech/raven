@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ChevronRight, Trash2 } from "lucide-react"
 import { Button } from "@components/ui/button"
 import { Input } from "@components/ui/input"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@components/ui/alert-dialog"
 import _ from "@lib/translate"
+import { cn } from "@lib/utils"
 import { revokeTokens, signIn, tokenStore } from "./auth"
-import { pendingNotice, pendingRelogin } from "./pending"
+import { subscribeNativeKeyboard } from "./keyboard"
+import { pendingNotice, pendingPath, pendingRelogin } from "./pending"
 import { unsubscribeSitePush } from "./push"
-import { forgetSite, loadSites, normalizeSiteUrl, probeSite, saveSite, setDefaultSite, wipeSiteData, type ProbeResult, type Site } from "./sites"
+import { completeSite, forgetSite, loadSites, normalizeSiteUrl, probeSite, saveSite, setDefaultSite, wipeSiteData, type ProbeResult, type Site } from "./sites"
 import { versionAtLeast, versionMismatch } from "./version"
 
 type ProbeError = Exclude<ProbeResult, { site: Site }>["error"]
@@ -22,7 +24,7 @@ const appVersion = async () => (await import("@capacitor/app")).App.getInfo().th
 const open = async (site: Site) => {
     // A record without the handshake fields is completed once, before it can open.
     if (!site.sitename || !site.clientId) {
-        const result = await probeSite(site.url)
+        const result = await completeSite(site)
         if ("error" in result) throw new PickerError(result.error)
         site = result.site
     }
@@ -54,12 +56,90 @@ const SiteLogo = ({ site }: { site: Site }) => {
     return <img src={new URL(site.logo, site.url).href} alt="" className="size-10 shrink-0 rounded-md" onError={() => setFailed(true)} />
 }
 
+// How far a row slides to show the trash behind it: the trash button's width, and the logo plus its
+// padding, so the logo tucks away exactly at the row's left edge.
+const REVEAL_PX = 48
+
+/** One saved site. The trash hides behind the row until a swipe left or the chevron slides the row aside. */
+const SiteRow = ({ site, revealed, disabled, onReveal, onOpen, onRemove }: {
+    site: Site; revealed: boolean; disabled: boolean
+    onReveal: (revealed: boolean) => void; onOpen: () => void; onRemove: () => void
+}) => {
+    const card = useRef<HTMLDivElement>(null)
+    // A drag writes --reveal on the card directly, so no touch move renders; letting go hands the result to state.
+    const drag = useRef<{ x: number; y: number; horizontal: boolean | null; reveal: number } | null>(null)
+    const rest = revealed ? 1 : 0
+
+    const onTouchStart = (e: React.TouchEvent) => { drag.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontal: null, reveal: rest } }
+    const onTouchMove = (e: React.TouchEvent) => {
+        const d = drag.current
+        if (!d || !card.current) return
+        const dx = e.touches[0].clientX - d.x, dy = e.touches[0].clientY - d.y
+        // The first few pixels decide the axis, so a vertical scroll of the list never drags a row.
+        if (d.horizontal === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) d.horizontal = Math.abs(dx) > Math.abs(dy)
+        if (!d.horizontal) return
+        d.reveal = Math.min(1, Math.max(0, rest - dx / REVEAL_PX))
+        // data-dragging turns the transitions off, so the row follows the finger exactly.
+        card.current.dataset.dragging = ""
+        card.current.style.setProperty("--reveal", String(d.reveal))
+    }
+    const onTouchEnd = () => {
+        const d = drag.current
+        drag.current = null
+        if (!d?.horizontal || !card.current) return
+        const open = d.reveal > 0.5
+        delete card.current.dataset.dragging
+        card.current.style.setProperty("--reveal", open ? "1" : "0")
+        onReveal(open)
+    }
+
+    return (
+        <li style={{ "--slot": `${REVEAL_PX}px` } as React.CSSProperties} className="relative shrink-0 overflow-hidden rounded-lg">
+            <button type="button" aria-label={_("Remove site")} aria-hidden={!revealed} tabIndex={revealed ? 0 : -1} disabled={disabled} onClick={onRemove}
+                className="absolute inset-y-0 right-0 flex w-[var(--slot)] items-center justify-end pe-1.5 text-ink-red-6">
+                {/* Hard against the right edge: the gap to the slid card is the wider one, so the icon reads as apart from the row. */}
+                <Trash2 className="size-5" />
+            </button>
+            <div ref={card} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
+                // --reveal runs from 0 closed to 1 open. The slide and the chevron's turn both read it, so they move as one.
+                style={{ "--reveal": rest } as React.CSSProperties}
+                // A touch on either button lights the whole row, not just the button under the finger.
+                className="group relative flex -translate-x-[calc(var(--reveal)*var(--slot))] items-center rounded-lg bg-surface-gray-2 transition-[translate] duration-200 ease-out has-[button:active]:bg-surface-gray-3 data-[dragging]:transition-none">
+                {/* A tap on a row that is slid aside puts it back; only a resting row opens its site. */}
+                <button type="button" disabled={disabled} onClick={() => (revealed ? onReveal(false) : onOpen())}
+                    className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-3 ps-2 text-left">
+                    <SiteLogo site={site} />
+                    <span className="flex flex-1 flex-col gap-1 min-w-0">
+                        <span className="text-base font-medium truncate">{site.name}</span>
+                        <span className="text-sm text-ink-gray-6 truncate">{new URL(site.url).host}</span>
+                    </span>
+                </button>
+                <button type="button" aria-label={_("Show remove")} aria-expanded={revealed} disabled={disabled} onClick={() => onReveal(!revealed)}
+                    className="flex size-12 shrink-0 items-center justify-center text-ink-gray-5">
+                    <ChevronRight className="rotate-[calc(var(--reveal)*180deg)] transition-[rotate] duration-200 ease-out group-data-[dragging]:transition-none" />
+                </button>
+            </div>
+        </li>
+    )
+}
+
 export const SitePicker = () => {
     const [sites, setSites] = useState<Site[]>([])
     const [url, setUrl] = useState("")
     const [busy, setBusy] = useState<string | null>(null)
     const [error, setError] = useState<PickerError | string | null>(null)
     const [removing, setRemoving] = useState<Site | null>(null)
+    // A share that arrived with no site open waits for one: the list says where a tap will send it.
+    const [sharing, setSharing] = useState(false)
+    // shareIn is imported here, not at the top: boot loads this file, and shareIn reaches into the app's modules.
+    useEffect(() => {
+        Promise.all([pendingPath.peek(), import("./shareIn")]).then(([path, m]) => setSharing(path === m.SHARE_TARGET_PATH)).catch(() => { })
+    }, [])
+    // One row shows its trash at a time.
+    const [revealed, setRevealed] = useState<string | null>(null)
+    // The page never resizes for the keyboard, so the column makes room for it itself.
+    const [keyboard, setKeyboard] = useState(0)
+    useEffect(() => subscribeNativeKeyboard((_open, height) => setKeyboard(height)), [])
 
     useEffect(() => {
         loadSites().then(async (list) => {
@@ -93,6 +173,7 @@ export const SitePicker = () => {
 
     const remove = (site: Site) => run(site.url, async () => {
         setRemoving(null)
+        setRevealed(null)
         // Everything local goes first and at once: a site that has stopped answering must not hold the picker.
         const tokens = await tokenStore.get(site.url)
         await tokenStore.remove(site.url)
@@ -104,29 +185,28 @@ export const SitePicker = () => {
     })
 
     return (
-        <main className="min-h-dvh bg-surface-white text-ink-gray-9 flex flex-col gap-6 px-5 pt-[calc(var(--inset-top)+3rem)] pb-8 max-w-md mx-auto w-full">
+        // The page itself never scrolls: one centred column, and only the sites list scrolls inside it.
+        // With the keyboard up the column sits on the keyboard's top edge, so the button stays right above it.
+        <main style={{ "--keyboard": `${keyboard}px` } as React.CSSProperties}
+            className={cn("h-dvh overflow-hidden bg-surface-white text-ink-gray-9 flex flex-col gap-6 px-6 pt-[var(--inset-top)] max-w-md mx-auto w-full",
+                keyboard ? "justify-end pb-[calc(var(--keyboard)+0.75rem)]" : "justify-center pb-[max(var(--inset-bottom),1.5rem)]")}>
             <h1 className="text-3xl font-semibold">raven</h1>
             {sites.length > 0 && (
                 <section className="flex flex-col gap-2">
-                    <p className="text-sm text-ink-gray-6">{_("Select a site")}</p>
-                    <ul className="flex flex-col gap-2">
+                    <p className="text-sm text-ink-gray-6">{sharing ? _("Share to") : _("Select an existing site")}</p>
+                    {/* Capped at four and a half rows, the half hinting at more, so the form stays on screen and in reach.
+                        18rem is the rest of the column with its bottom padding; the top inset and the keyboard come out too. */}
+                    <ul className="flex flex-col gap-2 max-h-[min(20.5rem,calc(100dvh-var(--keyboard)-var(--inset-top)-18rem))] overflow-y-auto overscroll-contain scroll-fade">
                         {sites.map((site) => (
-                            <li key={site.url} className="flex items-center gap-2">
-                                <button type="button" disabled={busy !== null} onClick={() => run(site.url, () => open(site))}
-                                    className="flex flex-1 items-center gap-3 rounded-lg bg-surface-gray-2 px-3 py-3 text-left active:bg-surface-gray-3">
-                                    <SiteLogo site={site} />
-                                    <span className="flex flex-1 flex-col min-w-0">
-                                        <span className="text-base font-medium truncate">{site.name}</span>
-                                        <span className="text-sm text-ink-gray-6 truncate">{new URL(site.url).host}</span>
-                                    </span>
-                                    <ChevronRight className="text-ink-gray-5" />
-                                </button>
-                                <Button type="button" variant="ghost" size="md" isIconButton aria-label={_("Remove site")} disabled={busy !== null} onClick={() => setRemoving(site)}>
-                                    <Trash2 />
-                                </Button>
-                            </li>
+                            <SiteRow key={site.url} site={site} revealed={revealed === site.url} disabled={busy !== null}
+                                onReveal={(on) => setRevealed(on ? site.url : null)}
+                                onOpen={() => run(site.url, () => open(site))} onRemove={() => setRemoving(site)} />
                         ))}
                     </ul>
+                    {/* The form below is a second way in, not part of the list. */}
+                    <div className="flex items-center gap-2 pt-2 text-sm text-ink-gray-5">
+                        <hr className="flex-1 border-outline-gray-2" /><span>{_("or")}</span><hr className="flex-1 border-outline-gray-2" />
+                    </div>
                 </section>
             )}
             <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); addSite() }}>
@@ -136,7 +216,9 @@ export const SitePicker = () => {
                     value={url} onChange={(e) => setUrl(e.target.value)} />
                 <Button type="submit" variant="solid" size="lg" loading={busy === "add"} loadingText={_("Connecting…")}>{_("Add site")}</Button>
             </form>
-            <p role="alert" className="min-h-5 text-sm text-ink-red-6">
+            {/* Keeps its height when empty so an error never shifts the layout; with the keyboard up that
+                height would sit between the button and the keyboard, so there it takes none. */}
+            <p role="alert" className={cn("-mt-4 text-sm text-ink-red-6", !keyboard && "min-h-5")}>
                 {typeof error === "string" && error}
                 {error instanceof PickerError && error.kind === "no-address" && _("Enter a site address.")}
                 {error instanceof PickerError && error.kind === "unreachable" && _("Could not reach this site.")}

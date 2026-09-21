@@ -3,6 +3,8 @@ import { withPrefs } from "./platform"
 /** A value that survives one reload: set before it, taken once after it. */
 export const pending = (key: string) => ({
     set: (value: string) => withPrefs((p) => p.set({ key, value })),
+    /** Reads without taking: the picker words itself by a share that the app, once open, still has to take. */
+    peek: (): Promise<string | null> => withPrefs((p) => p.get({ key })).then(({ value }) => value ?? null),
     take: async (): Promise<string | null> => {
         const { value } = await withPrefs((p) => p.get({ key }))
         if (value) await withPrefs((p) => p.remove({ key }))
