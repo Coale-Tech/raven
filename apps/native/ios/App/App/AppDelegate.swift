@@ -11,6 +11,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    // iPhone is portrait only. A fullscreen video plays in a window of its own; that one may rotate.
+    // The app's window is told by its root: the scene owns it, so `window` here is never set.
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        if UIDevice.current.userInterfaceIdiom == .pad { return .all }
+        return window?.rootViewController is CAPBridgeViewController ? .portrait : .allButUpsideDown
+    }
+
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
