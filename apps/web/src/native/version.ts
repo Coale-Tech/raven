@@ -8,3 +8,10 @@ export const versionAtLeast = (version: string, minimum: string): boolean => {
     }
     return true
 }
+
+/** "minor" when major or minor differ; patch differences and unknown versions are silent. */
+export const versionMismatch = (siteVersion: string, appVersion: string): "minor" | null => {
+    if (!siteVersion || !appVersion) return null
+    const [sa, sb] = siteVersion.split("."), [aa, ab] = appVersion.split(".")
+    return sa === aa && sb === ab ? null : "minor"
+}

@@ -84,10 +84,11 @@ export const defaultDeps: AuthDeps = {
         const handle = await Browser.addListener("browserFinished", () => handler())
         return () => { handle.remove().catch(() => { }) }
     },
-    // Native request: token posts need no CORS and carry no cookies.
+    // Native request: token posts need no CORS and carry no cookies. Boot waits on a refresh before
+    // anything renders, so it is bounded: the plugin's own default is ten minutes.
     post: async (url, form) => {
         const { CapacitorHttp } = await import("@capacitor/core")
-        const res = await CapacitorHttp.post({ url, headers: { "Content-Type": "application/x-www-form-urlencoded" }, data: form })
+        const res = await CapacitorHttp.post({ url, headers: { "Content-Type": "application/x-www-form-urlencoded" }, data: form, connectTimeout: 8000, readTimeout: 8000 })
         return { status: res.status, data: res.data }
     },
     store: tokenStore,
@@ -95,10 +96,16 @@ export const defaultDeps: AuthDeps = {
     now: () => Date.now(),
 }
 
+/** The site answered and said no (invalid_grant, revoked client); a network failure is a plain Error. */
+export const rejectedExchange = (reason: string) => Object.assign(new Error(reason), { rejected: true as const })
+export const isRejectedExchange = (e: unknown): boolean => !!(e as { rejected?: boolean } | null)?.rejected
+
 const exchange = async (site: string, form: Record<string, string>, prev: StoredTokens | null, deps: AuthDeps): Promise<StoredTokens> => {
     const res = await deps.post(`${site}${TOKEN_ENDPOINT}`, form)
     const data = res.data as TokenResponse | null
-    if (res.status < 200 || res.status >= 300 || !data?.access_token) throw new Error(data?.error || "Token exchange failed")
+    // A 5xx is the site being down or in maintenance, not a verdict on the tokens.
+    if (res.status >= 500) throw new Error(`Token endpoint answered ${res.status}`)
+    if (res.status < 200 || res.status >= 300 || !data?.access_token) throw rejectedExchange(data?.error || "Token exchange failed")
     return {
         accessToken: data.access_token,
         refreshToken: data.refresh_token ?? prev?.refreshToken,
@@ -163,18 +170,22 @@ export const signIn = async (site: string, clientId: string, deps: AuthDeps = de
 /** Throws on failure and leaves the stored tokens as they were. */
 export const refreshTokens = async (site: string, clientId: string, deps: AuthDeps = defaultDeps): Promise<StoredTokens> => {
     const prev = await deps.store.get(site)
-    if (!prev?.refreshToken) throw new Error("No refresh token")
+    // No retry can succeed without one, so this counts as the site's refusal: sign in again.
+    if (!prev?.refreshToken) throw rejectedExchange("No refresh token")
     const tokens = await exchange(site, { grant_type: "refresh_token", refresh_token: prev.refreshToken, client_id: clientId }, prev, deps)
     await deps.store.set(site, tokens)
     return tokens
 }
 
+/** Best effort, both at once: the site may not answer, and the tokens are forgotten locally already. */
+export const revokeTokens = async (site: string, tokens: StoredTokens, deps: AuthDeps = defaultDeps) => {
+    const revoke = (token: string, hint: string) =>
+        deps.post(`${site}/api/method/frappe.integrations.oauth2.revoke_token`, { token, token_type_hint: hint }).catch(() => { })
+    await Promise.all([tokens.refreshToken && revoke(tokens.refreshToken, "refresh_token"), revoke(tokens.accessToken, "access_token")])
+}
+
 export const signOut = async (site: string, deps: AuthDeps = defaultDeps) => {
     const tokens = await deps.store.get(site)
     await deps.store.remove(site)
-    if (!tokens) return
-    const revoke = (token: string, hint: string) =>
-        deps.post(`${site}/api/method/frappe.integrations.oauth2.revoke_token`, { token, token_type_hint: hint }).catch(() => { })
-    if (tokens.refreshToken) await revoke(tokens.refreshToken, "refresh_token")
-    await revoke(tokens.accessToken, "access_token")
+    if (tokens) await revokeTokens(site, tokens, deps)
 }

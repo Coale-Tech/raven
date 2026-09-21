@@ -1,7 +1,7 @@
 import { siteFetch, siteKey, siteOrigin } from "@lib/site"
 import { refreshTokens } from "./auth"
 import { inAppPath } from "./links"
-import { setPendingPath } from "./pending"
+import { pendingPath } from "./pending"
 import { listenNative, nativePlatform, withPrefs } from "./platform"
 import { ravenShell } from "./shell"
 import { loadSites, setDefaultSite, type Site } from "./sites"
@@ -66,18 +66,21 @@ export const disableNativePush = async (): Promise<void> => {
 }
 
 /** Picker removal of a site that is not the active one: a fresh bearer, one native POST, best effort. */
-export const unsubscribeSitePush = async (site: Site): Promise<void> => {
+export const unsubscribeSitePush = async (site: Site, bearer?: string): Promise<void> => {
     try {
         const key = pushTokenKey(site.url)
         const { value: token } = await withPrefs((p) => p.get({ key }))
         if (!token) return
         await withPrefs((p) => p.remove({ key }))
-        const { accessToken } = await refreshTokens(site.url, site.clientId)
+        // A caller that has already forgotten the tokens passes the bearer it kept.
+        const accessToken = bearer ?? (await refreshTokens(site.url, site.clientId)).accessToken
         const { CapacitorHttp } = await import("@capacitor/core")
         await CapacitorHttp.post({
             url: `${site.url}/api/method/raven.api.notification.unsubscribe`,
             headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
             data: { fcm_token: token },
+            connectTimeout: 8000,
+            readTimeout: 8000,
         })
     } catch {
         // The token dies as an FCM zombie on the server; the site's sign-out follows anyway.
@@ -104,7 +107,7 @@ export const openNotificationTarget = async (data: Record<string, string>, navig
     if (target.kind === "same-site") return navigate(target.path)
     const origin = new URL(target.url).origin
     if (!(await loadSites()).some((s) => s.url === origin)) return
-    await setPendingPath(inAppPath(target.url, origin, "raven") ?? "/")
+    await pendingPath.set(inAppPath(target.url, origin, "raven") ?? "/")
     await setDefaultSite(origin)
     window.location.replace("/")
 }

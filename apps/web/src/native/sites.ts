@@ -1,5 +1,4 @@
 import { withPrefs } from "./platform"
-import { versionAtLeast } from "./version"
 
 export type Site = {
     /** Origin the site answers from, e.g. https://raven.example.com */
@@ -10,6 +9,8 @@ export type Site = {
     clientId: string
     logo?: string
     ravenVersion: string
+    /** The handshake asked for a newer app; a prompt, never a block. */
+    minAppVersion?: string
 }
 
 const SITES_KEY = "sites"
@@ -41,22 +42,21 @@ const nativeGetJson: GetJson = async (url) => {
     return { status: res.status, data: res.data, url: res.url }
 }
 
-export type ProbeResult = { site: Site } | { error: "unreachable" | "not-raven" | "site-too-old" | "app-too-old" | "no-client" }
+export type ProbeResult = { site: Site } | { error: "unreachable" | "not-raven" | "site-too-old" | "no-client" }
 
 type Handshake = { client_id?: string | null; raven_version?: string; min_app_version?: string; sitename?: string; app_name?: string; logo?: string }
 
-export const probeSite = async (url: string, appVersion: string, getJson: GetJson = nativeGetJson): Promise<ProbeResult> => {
+export const probeSite = async (url: string, getJson: GetJson = nativeGetJson): Promise<ProbeResult> => {
     let res: JsonResponse
     try {
         res = await getJson(`${url}/api/method/raven.api.native.handshake`)
     } catch {
         return { error: "unreachable" }
     }
-    // 404 and 417 are Frappe's answers for a method it does not know.
+    // 404 and 417 are Frappe's answers for a method it does not know: a site older than the native API.
     if (res.status === 404 || res.status === 417) return { error: "site-too-old" }
     const message = (res.data as { message?: Handshake } | null)?.message
     if (res.status !== 200 || !message?.sitename || !message.raven_version) return { error: "not-raven" }
-    if (!versionAtLeast(appVersion, message.min_app_version ?? "0")) return { error: "app-too-old" }
     if (!message.client_id) return { error: "no-client" }
     return {
         site: {
@@ -67,6 +67,7 @@ export const probeSite = async (url: string, appVersion: string, getJson: GetJso
             clientId: message.client_id,
             logo: message.logo || undefined,
             ravenVersion: message.raven_version,
+            minAppVersion: message.min_app_version || undefined,
         },
     }
 }
@@ -85,9 +86,25 @@ export const saveSite = async (site: Site) => {
 }
 
 /** Drops the list entry and the default; tokens are the session module's job. */
+/** Everything stored for a site: its scoped keys, its database, and the media cache all sites share. */
+export const wipeSiteData = async (url: string) => {
+    const prefix = `${url}|`
+    Object.keys(localStorage).filter((key) => key.startsWith(prefix)).forEach((key) => localStorage.removeItem(key))
+    indexedDB.deleteDatabase(`${prefix}RavenDB`)
+    await import("./download").then((m) => m.clearMediaCache()).catch(() => { })
+}
+
 export const forgetSite = async (url: string) => {
     await writeSites((await loadSites()).filter((s) => s.url !== url))
     if ((await getDefaultSite()) === url) await setDefaultSite(null)
+}
+
+/** Re-probes an open site and saves what changed; a guest call, so nothing is lost when it fails. */
+export const refreshSite = async (site: Site, getJson: GetJson = nativeGetJson) => {
+    const result = await probeSite(site.url, getJson)
+    if ("error" in result) return
+    const fresh = { ...site, name: result.site.name, logo: result.site.logo, ravenVersion: result.site.ravenVersion, minAppVersion: result.site.minAppVersion }
+    if (JSON.stringify(fresh) !== JSON.stringify(site)) await saveSite(fresh)
 }
 
 export const getDefaultSite = (): Promise<string | null> => withPrefs((p) => p.get({ key: DEFAULT_SITE_KEY })).then((r) => r.value)

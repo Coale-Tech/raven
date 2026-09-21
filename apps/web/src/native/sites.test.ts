@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { forgetSite, getDefaultSite, loadSites, normalizeSiteUrl, probeSite, saveSite, setDefaultSite, type Site } from "./sites"
+import { forgetSite, getDefaultSite, loadSites, normalizeSiteUrl, probeSite, refreshSite, saveSite, setDefaultSite, wipeSiteData, type Site } from "./sites"
 
 const { prefs } = vi.hoisted(() => ({ prefs: new Map<string, string>() }))
 vi.mock("@capacitor/preferences", () => ({
@@ -11,6 +11,9 @@ vi.mock("@capacitor/preferences", () => ({
         then: () => { throw new Error("Preferences.then() is not implemented") },
     },
 }))
+
+const clearMediaCache = vi.hoisted(() => vi.fn(async () => { }))
+vi.mock("./download", () => ({ clearMediaCache }))
 
 const site = (url: string, name = "A"): Site => ({ url, name, sitename: "a.com", clientId: "C", ravenVersion: "3.0.0" })
 
@@ -65,23 +68,50 @@ describe("probeSite", () => {
 
     it("returns the site from the handshake, on the origin the site answered from", async () => {
         const getJson = answer(good, 200, "https://www.a.com/api/method/raven.api.native.handshake")
-        const result = await probeSite("https://a.com", "2.0.0", getJson)
-        expect(result).toEqual({ site: { url: "https://www.a.com", name: "Acme", sitename: "a.com", clientId: "C", logo: "/files/logo.png", ravenVersion: "3.0.0" } })
+        const result = await probeSite("https://a.com", getJson)
+        expect(result).toEqual({ site: { url: "https://www.a.com", name: "Acme", sitename: "a.com", clientId: "C", logo: "/files/logo.png", ravenVersion: "3.0.0", minAppVersion: "2.0.0" } })
         expect(getJson).toHaveBeenCalledWith("https://a.com/api/method/raven.api.native.handshake")
     })
     it("reports a site without the handshake as too old", async () => {
-        expect(await probeSite("https://a.com", "2.0.0", answer({}, 404))).toEqual({ error: "site-too-old" })
+        expect(await probeSite("https://old.com", vi.fn(async () => ({ status: 404, data: null })))).toEqual({ error: "site-too-old" })
     })
     it("reports a non-Raven answer", async () => {
-        expect(await probeSite("https://a.com", "2.0.0", vi.fn(async () => ({ status: 200, data: "<html>" })))).toEqual({ error: "not-raven" })
+        expect(await probeSite("https://a.com", vi.fn(async () => ({ status: 200, data: "<html>" })))).toEqual({ error: "not-raven" })
     })
     it("reports an unreachable host", async () => {
-        expect(await probeSite("https://a.com", "2.0.0", vi.fn(async () => { throw new Error("timeout") }))).toEqual({ error: "unreachable" })
+        expect(await probeSite("https://a.com", vi.fn(async () => { throw new Error("timeout") }))).toEqual({ error: "unreachable" })
     })
-    it("reports an app older than the site demands", async () => {
-        expect(await probeSite("https://a.com", "1.9.0", answer(good))).toEqual({ error: "app-too-old" })
+    it("keeps min_app_version on the site instead of blocking", async () => {
+        const result = await probeSite("https://a.com", answer({ ...good, min_app_version: "9.0.0" }))
+        expect("site" in result && result.site.minAppVersion).toBe("9.0.0")
     })
     it("reports a site without a usable OAuth client", async () => {
-        expect(await probeSite("https://a.com", "2.0.0", answer({ ...good, client_id: null }))).toEqual({ error: "no-client" })
+        expect(await probeSite("https://a.com", answer({ ...good, client_id: null }))).toEqual({ error: "no-client" })
+    })
+})
+
+describe("refreshSite", () => {
+    beforeEach(() => prefs.clear())
+    it("saves the probed logo, name and version onto the record", async () => {
+        const old = site("https://a.com")
+        await saveSite(old)
+        const getJson = async () => ({ status: 200, data: { message: { client_id: "C", raven_version: "3.1.0", sitename: "a.com", app_name: "Acme", logo: "/assets/raven/raven_logo.svg" } } })
+        await refreshSite(old, getJson)
+        expect((await loadSites())[0]).toMatchObject({ url: "https://a.com", name: "Acme", logo: "/assets/raven/raven_logo.svg", ravenVersion: "3.1.0" })
+    })
+})
+
+describe("wipeSiteData", () => {
+    it("removes that site's scoped keys and database, and nothing of another site", async () => {
+        const store = new Map([["https://a.com|raven-boot-cache", "1"], ["https://a.com|app-cache", "2"], ["https://a.company.com|raven-draft", "3"], ["raven-theme", "dark"]])
+        const local = { removeItem: (key: string) => { store.delete(key) } }
+        vi.stubGlobal("localStorage", new Proxy(local, { ownKeys: () => [...store.keys()], getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }) }))
+        const deleteDatabase = vi.fn()
+        vi.stubGlobal("indexedDB", { deleteDatabase })
+        await wipeSiteData("https://a.com")
+        expect([...store.keys()]).toEqual(["https://a.company.com|raven-draft", "raven-theme"])
+        expect(deleteDatabase).toHaveBeenCalledWith("https://a.com|RavenDB")
+        expect(clearMediaCache).toHaveBeenCalled()
+        vi.unstubAllGlobals()
     })
 })

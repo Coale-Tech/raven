@@ -4,50 +4,80 @@ import { Button } from "@components/ui/button"
 import { Input } from "@components/ui/input"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@components/ui/alert-dialog"
 import _ from "@lib/translate"
-import { signIn, signOut, tokenStore } from "./auth"
+import { revokeTokens, signIn, tokenStore } from "./auth"
+import { pendingNotice, pendingRelogin } from "./pending"
 import { unsubscribeSitePush } from "./push"
-import { forgetSite, loadSites, normalizeSiteUrl, probeSite, saveSite, setDefaultSite, type ProbeResult, type Site } from "./sites"
+import { forgetSite, loadSites, normalizeSiteUrl, probeSite, saveSite, setDefaultSite, wipeSiteData, type ProbeResult, type Site } from "./sites"
+import { versionAtLeast, versionMismatch } from "./version"
 
-const probeMessage = (result: Exclude<ProbeResult, { site: Site }>) => ({
-    "unreachable": _("Could not reach this site."),
-    "not-raven": _("This does not look like a Raven site."),
-    "site-too-old": _("This site runs an older Raven. Ask its admin to update."),
-    "app-too-old": _("Update the Raven app to use this site."),
-    "no-client": _("This site has no OAuth client for the app. Ask its admin to set one up in Raven Settings."),
-}[result.error])
+type ProbeError = Exclude<ProbeResult, { site: Site }>["error"]
+/** A failure the picker words itself; anything else shows the thrown message as is. */
+class PickerError extends Error {
+    constructor(readonly kind: ProbeError | "no-address") { super(kind) }
+}
 
 const appVersion = async () => (await import("@capacitor/app")).App.getInfo().then((i) => i.version).catch(() => "0")
 
 /** Opens a saved site: silent when tokens exist, else the browser login. */
 const open = async (site: Site) => {
-    // Records saved by the remote-loading app lack the handshake fields; fetch them once.
+    // A record without the handshake fields is completed once, before it can open.
     if (!site.sitename || !site.clientId) {
-        const result = await probeSite(site.url, await appVersion())
-        if ("error" in result) throw new Error(probeMessage(result))
+        const result = await probeSite(site.url)
+        if ("error" in result) throw new PickerError(result.error)
         site = result.site
     }
     if (!(await tokenStore.get(site.url))) await signIn(site.url, site.clientId)
     await saveSite(site)
     await setDefaultSite(site.url)
+    const notice = await versionNotice(site)
+    if (notice) await pendingNotice.set(JSON.stringify(notice))
     window.location.replace("/")
+    // The page is leaving: never settle, so the picker stays busy until it does.
+    return new Promise<void>(() => { })
+}
+
+/** What the app toasts once it is up; worded there, where it is shown. */
+export type VersionNotice = { kind: "mismatch"; site: string; app: string } | { kind: "update" }
+
+const versionNotice = async (site: Site): Promise<VersionNotice | null> => {
+    if (versionMismatch(site.ravenVersion, __RAVEN_VERSION__)) return { kind: "mismatch", site: site.ravenVersion, app: __RAVEN_VERSION__ }
+    if (site.minAppVersion && !versionAtLeast(await appVersion(), site.minAppVersion)) return { kind: "update" }
+    return null
+}
+
+/** The site's logo, or its initial on a tile when there is none or it fails to load. */
+const SiteLogo = ({ site }: { site: Site }) => {
+    const [failed, setFailed] = useState(false)
+    if (!site.logo || failed) {
+        return <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-surface-gray-3 text-lg font-semibold text-ink-gray-7">{site.name.slice(0, 1).toUpperCase()}</span>
+    }
+    return <img src={new URL(site.logo, site.url).href} alt="" className="size-10 shrink-0 rounded-md" onError={() => setFailed(true)} />
 }
 
 export const SitePicker = () => {
     const [sites, setSites] = useState<Site[]>([])
     const [url, setUrl] = useState("")
     const [busy, setBusy] = useState<string | null>(null)
-    const [error, setError] = useState("")
+    const [error, setError] = useState<PickerError | string | null>(null)
     const [removing, setRemoving] = useState<Site | null>(null)
 
-    useEffect(() => { loadSites().then(setSites) }, [])
+    useEffect(() => {
+        loadSites().then(async (list) => {
+            setSites(list)
+            // A dead session lands here with its site named; sign it in again without a tap.
+            const url = await pendingRelogin.take()
+            const site = url && list.find((s) => s.url === url)
+            if (site) run(site.url, () => open(site))
+        })
+    }, [])
 
     const run = async (key: string, action: () => Promise<void>) => {
         setBusy(key)
-        setError("")
+        setError(null)
         try {
             await action()
         } catch (e) {
-            setError(String((e as { message?: string })?.message ?? e))
+            setError(e instanceof PickerError ? e : String((e as { message?: string })?.message ?? e))
         } finally {
             setBusy(null)
         }
@@ -55,23 +85,26 @@ export const SitePicker = () => {
 
     const addSite = () => run("add", async () => {
         const origin = normalizeSiteUrl(url)
-        if (!origin) throw new Error(_("Enter a site address."))
-        const result = await probeSite(origin, await appVersion())
-        if ("error" in result) throw new Error(probeMessage(result))
+        if (!origin) throw new PickerError("no-address")
+        const result = await probeSite(origin)
+        if ("error" in result) throw new PickerError(result.error)
         await open(result.site)
     })
 
     const remove = (site: Site) => run(site.url, async () => {
         setRemoving(null)
-        // Before the revoke: the unsubscribe needs a bearer for that site.
-        await unsubscribeSitePush(site)
-        await signOut(site.url)
+        // Everything local goes first and at once: a site that has stopped answering must not hold the picker.
+        const tokens = await tokenStore.get(site.url)
+        await tokenStore.remove(site.url)
         await forgetSite(site.url)
+        await wipeSiteData(site.url)
         setSites(await loadSites())
+        // The site's side runs on unawaited. The unsubscribe needs the bearer, so it goes before the revoke.
+        if (tokens) void unsubscribeSitePush(site, tokens.accessToken).then(() => revokeTokens(site.url, tokens))
     })
 
     return (
-        <main className="min-h-dvh bg-surface-white text-ink-gray-9 flex flex-col gap-6 px-5 pt-[calc(env(safe-area-inset-top)+3rem)] pb-8 max-w-md mx-auto w-full">
+        <main className="min-h-dvh bg-surface-white text-ink-gray-9 flex flex-col gap-6 px-5 pt-[calc(var(--inset-top)+3rem)] pb-8 max-w-md mx-auto w-full">
             <h1 className="text-3xl font-semibold">raven</h1>
             {sites.length > 0 && (
                 <section className="flex flex-col gap-2">
@@ -81,7 +114,7 @@ export const SitePicker = () => {
                             <li key={site.url} className="flex items-center gap-2">
                                 <button type="button" disabled={busy !== null} onClick={() => run(site.url, () => open(site))}
                                     className="flex flex-1 items-center gap-3 rounded-lg bg-surface-gray-2 px-3 py-3 text-left active:bg-surface-gray-3">
-                                    {site.logo && <img src={new URL(site.logo, site.url).href} alt="" className="size-10 rounded-md" />}
+                                    <SiteLogo site={site} />
                                     <span className="flex flex-1 flex-col min-w-0">
                                         <span className="text-base font-medium truncate">{site.name}</span>
                                         <span className="text-sm text-ink-gray-6 truncate">{new URL(site.url).host}</span>
@@ -103,7 +136,14 @@ export const SitePicker = () => {
                     value={url} onChange={(e) => setUrl(e.target.value)} />
                 <Button type="submit" variant="solid" size="lg" loading={busy === "add"} loadingText={_("Connecting…")}>{_("Add site")}</Button>
             </form>
-            <p role="alert" className="min-h-5 text-sm text-ink-red-6">{error}</p>
+            <p role="alert" className="min-h-5 text-sm text-ink-red-6">
+                {typeof error === "string" && error}
+                {error instanceof PickerError && error.kind === "no-address" && _("Enter a site address.")}
+                {error instanceof PickerError && error.kind === "unreachable" && _("Could not reach this site.")}
+                {error instanceof PickerError && error.kind === "not-raven" && _("This does not look like a Raven site.")}
+                {error instanceof PickerError && error.kind === "site-too-old" && _("This site runs an older Raven. Ask its admin to update.")}
+                {error instanceof PickerError && error.kind === "no-client" && _("This site has no OAuth client for the app. Ask its admin to set one up in Raven Settings.")}
+            </p>
             <AlertDialog open={removing !== null} onOpenChange={(o) => { if (!o) setRemoving(null) }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>

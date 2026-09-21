@@ -45,8 +45,10 @@ export const siteStorage = <T,>(): SyncStorage<T> =>
 /** fetch against the site: bearer token in native, session cookies in the browser. */
 export const siteFetch = (path: string, init: RequestInit = {}): Promise<Response> => {
     const headers = { ...(init.headers as Record<string, string> | undefined) }
-    if (active) headers.Authorization = `Bearer ${active.getToken()}`
-    return fetch(siteUrl(path), active ? { ...init, headers } : { ...init, credentials: "include", headers })
+    const url = siteUrl(path)
+    // The bearer is for the site alone: an absolute url elsewhere goes without it.
+    if (active && url.startsWith(`${active.origin}/`)) headers.Authorization = `Bearer ${active.getToken()}`
+    return fetch(url, active ? { ...init, headers } : { ...init, credentials: "include", headers })
 }
 
 /** A site-relative or site-absolute path under /private/files/, which needs the token. */

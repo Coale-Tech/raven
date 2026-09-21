@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { REDIRECT_URL, buildAuthorizeUrl, parseCallback, refreshTokens, signIn, signOut, tokenStore, type AuthDeps, type StoredTokens } from "./auth"
+import { REDIRECT_URL, buildAuthorizeUrl, isRejectedExchange, parseCallback, refreshTokens, signIn, signOut, tokenStore, type AuthDeps, type StoredTokens } from "./auth"
 
 const { secure } = vi.hoisted(() => ({ secure: new Map<string, string>() }))
 vi.mock("capacitor-secure-storage-plugin", () => ({
@@ -126,6 +126,20 @@ describe("signIn", () => {
 })
 
 describe("refreshTokens", () => {
+    it("marks a refusal as rejected, and a server failure as not", async () => {
+        const refused = makeDeps({ post: vi.fn(async () => ({ status: 400, data: { error: "invalid_grant" } })) })
+        refused.stored.set("https://a.com", { accessToken: "AT", refreshToken: "RT", expiresAt: 0 })
+        await expect(refreshTokens("https://a.com", "C", refused.deps)).rejects.toSatisfy((e) => isRejectedExchange(e))
+        const down = makeDeps({ post: vi.fn(async () => ({ status: 503, data: null })) })
+        down.stored.set("https://a.com", { accessToken: "AT", refreshToken: "RT", expiresAt: 0 })
+        await expect(refreshTokens("https://a.com", "C", down.deps)).rejects.toSatisfy((e) => !isRejectedExchange(e))
+    })
+    it("is rejected without a refresh token: no retry can succeed, only a new sign-in", async () => {
+        const { deps, stored } = makeDeps()
+        stored.set("https://a.com", { accessToken: "AT", expiresAt: 0 })
+        await expect(refreshTokens("https://a.com", "C", deps)).rejects.toSatisfy((e) => isRejectedExchange(e))
+        expect(deps.post).not.toHaveBeenCalled()
+    })
     it("posts the refresh token and stores the new pair, keeping the old refresh token when none is returned", async () => {
         const { deps, stored } = makeDeps({ post: vi.fn(async () => ({ status: 200, data: { access_token: "AT2", expires_in: 60 } })) })
         stored.set("https://a.com", { accessToken: "AT", refreshToken: "RT", expiresAt: 0 })

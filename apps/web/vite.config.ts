@@ -1,4 +1,5 @@
 import path from "path"
+import fs from "node:fs"
 import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from 'vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
@@ -12,7 +13,10 @@ export default defineConfig(({ mode }) => {
 // --mode native (.env.native): the Capacitor bundle. Plain HTML entry, no service
 // worker, served from the app's own origin at /, output consumed by apps/native.
 const native = mode === "native"
+// The bundled Raven version, for the site-version notice; the Python package is the source.
+const ravenVersion = /__version__\s*=\s*"([^"]+)"/.exec(fs.readFileSync(path.resolve(__dirname, "../../raven/__init__.py"), "utf8"))?.[1] ?? "0"
 return {
+  define: { __RAVEN_VERSION__: JSON.stringify(ravenVersion) },
   publicDir: native ? false : "public",
   plugins: [
     react(),

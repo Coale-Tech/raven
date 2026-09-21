@@ -3,9 +3,12 @@ import { useNavigate } from "react-router-dom"
 import { isRootPath, registerAndroidBack } from "./back"
 import { subscribeLinkClicks } from "./links"
 import { trackKeyboardInset } from "./keyboard"
-import { takePendingPath } from "./pending"
+import { toast } from "sonner"
+import _ from "@lib/translate"
+import { pendingNotice, pendingPath } from "./pending"
 import { openNotificationTarget, subscribeForeignSiteNotifications, subscribeNotificationTaps } from "./push"
 import { subscribeShareDelivery } from "./shareIn"
+import type { VersionNotice } from "./SitePicker"
 
 /** Listeners that need the router: back, push taps, foreign pushes, share delivery, link clicks. */
 export default function NativeBridge() {
@@ -22,7 +25,13 @@ export default function NativeBridge() {
         const unTap = subscribeNotificationTaps((data) => { openNotificationTarget(data, go).catch(() => { }) })
         const unForeign = subscribeForeignSiteNotifications()
         const unShare = subscribeShareDelivery(go)
-        takePendingPath().then((path) => path && go(path))
+        pendingPath.take().then((path) => path && go(path))
+        pendingNotice.take().then((stored) => {
+            if (!stored || disposed) return
+            const notice = JSON.parse(stored) as VersionNotice
+            if (notice.kind === "mismatch") toast.warning(_("This site runs Raven {0}; the app is built for {1}. Some features may not work.", [notice.site, notice.app]), { duration: 8000 })
+            else toast.warning(_("A newer Raven app is available for this site."), { duration: 8000 })
+        }).catch(() => { })
         return () => { disposed = true; unBack(); unLinks(); unKeyboard(); unTap(); unForeign(); unShare() }
     }, [navigate])
 
