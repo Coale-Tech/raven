@@ -38,7 +38,8 @@ class TestNative(IntegrationTestCase):
 		self.assertEqual(data["sitename"], frappe.local.site)
 		self.assertTrue(data["raven_version"])
 		self.assertTrue(data["app_name"])
-		self.assertTrue(data["logo"])
+		# Same fallback as the page's tab icon.
+		self.assertEqual(data["logo"], "/assets/raven/raven_logo.svg")
 
 	def test_handshake_hides_client_without_native_redirect(self):
 		self.client.redirect_uris = "raven.thecommit.company:"

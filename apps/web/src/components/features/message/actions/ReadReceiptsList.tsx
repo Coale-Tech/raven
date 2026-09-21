@@ -141,7 +141,7 @@ export const ReadReceiptsList = ({
     // to the list (their channel_id is the thread, unknown to the store).
     const isDM = channelStore.getChannel(message.channel_id)?.is_direct_message === 1
 
-    if (error) return <ErrorBanner error={error} />
+    if (error) return <div className="p-3"><ErrorBanner error={error} /></div>
 
     if (isDM) {
         const seenLine = isLoading ? (

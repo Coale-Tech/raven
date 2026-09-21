@@ -3,6 +3,7 @@ import frappe.sessions
 from frappe.utils.change_log import get_versions
 
 from raven.api.raven_mobile import NATIVE_REDIRECT_URI
+from raven.www.raven import get_favicon
 
 # Bump to refuse older app builds; the app compares its own version against it.
 MIN_APP_VERSION = "3.0.0"
@@ -27,8 +28,7 @@ def handshake():
 		"min_app_version": MIN_APP_VERSION,
 		"sitename": frappe.local.site,
 		"app_name": app_name,
-		"logo": frappe.db.get_single_value("Navbar Settings", "app_logo")
-		or "/assets/raven/raven-logo.png",
+		"logo": get_favicon() or "/assets/raven/raven_logo.svg",
 	}
 
 

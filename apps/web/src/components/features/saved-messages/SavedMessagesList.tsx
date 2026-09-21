@@ -110,7 +110,7 @@ const SavedMessagesList = ({ searchQuery, channel, onSelect, selectedID }: Saved
             .sort((a, b) => new Date(b.creation).getTime() - new Date(a.creation).getTime())
     }, [data?.message, channelParam, searchQuery])
 
-    if (error) return <ErrorBanner error={error} />
+    if (error) return <div className="p-3"><ErrorBanner error={error} /></div>
     if (isLoading) return <MessageListSkeleton />
     if (results.length === 0) {
         // Absolute overlay centers over the whole pane (SavedMessages left pane is `relative`),
