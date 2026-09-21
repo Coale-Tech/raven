@@ -18,6 +18,7 @@ import { useMessagesRealtime } from "@stores/messages/useMessagesRealtime"
 import { useLinkPreviewsRealtime } from "@stores/linkPreviews/useLinkPreview"
 import { useConnectionFreshness } from "@hooks/useConnectionFreshness"
 import { useOnlineStatus } from "@stores/connectionState"
+import { cn } from "@lib/utils"
 import { useActiveSocketConnection } from "@hooks/useActiveSocketConnection"
 import { useOutboxAutoRetry } from "@stores/messages/useOutboxAutoRetry"
 import { useChannelListRealtime } from "@hooks/useChannelListRealtime"
@@ -230,12 +231,14 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
     const isMobile = useIsMobile()
     const online = useOnlineStatus()
+    // The banner takes the top inset while it shows, so its colour fills the status bar.
     const banner = !online && (
-        <div className="shrink-0 bg-surface-gray-3 py-1 text-center text-sm text-ink-gray-7">{_("You're offline")}</div>
+        <div className="shrink-0 bg-surface-gray-3 py-1 text-center text-sm text-ink-gray-7 standalone:pt-[calc(var(--inset-top)+0.25rem)]">{_("You're offline")}</div>
     )
+    const topInset = online ? "standalone:pt-[var(--inset-top)]" : ""
 
     if (isMobile) {
-        return <div className="flex h-dvh flex-col overflow-hidden standalone:pt-[env(safe-area-inset-top)]">
+        return <div className={cn("flex h-dvh flex-col overflow-hidden", topInset)}>
             {banner}
             {children}
         </div>
@@ -244,7 +247,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     return <div className="flex h-dvh overflow-hidden bg-surface-elevation-1">
         <PrimarySidebar />
         <RavenSettingsDialog />
-        <main className="flex min-w-0 flex-1 flex-col standalone:pt-[env(safe-area-inset-top)]">
+        <main className={cn("flex min-w-0 flex-1 flex-col", topInset)}>
             {banner}
             {children}
         </main>

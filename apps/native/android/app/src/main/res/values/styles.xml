@@ -15,6 +15,10 @@
         <item name="android:background">@null</item>
         <!-- First frame behind the system bars, before paintCanvas runs. -->
         <item name="android:windowBackground">@color/shell_background</item>
+        <!-- Transparent bars for every window of this theme: the splash plugin opens its own, above the page. -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">@bool/light_status_bar</item>
     </style>
 
 

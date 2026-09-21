@@ -50,7 +50,7 @@ function applyThemeToDocument(value: "light" | "dark") {
         || (value === "dark" ? "#171717" : "#ffffff")
     document.querySelectorAll('meta[name="theme-color"]')
         .forEach((meta) => meta.setAttribute("content", surface))
-    if (import.meta.env.VITE_NATIVE) import("../native/statusBar").then((m) => m.syncStatusBar(value, surface))
+    if (import.meta.env.VITE_NATIVE) import("../native/statusBar").then((m) => m.syncStatusBar(value))
 }
 
 function getStoredTheme(defaultTheme: Theme): Theme {

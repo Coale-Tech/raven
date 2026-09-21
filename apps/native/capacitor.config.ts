@@ -12,7 +12,7 @@ const config: CapacitorConfig = {
     plugins: {
         // The keyboard never resizes the page: iOS overlays it, Android pans (adjustPan in the manifest).
         Keyboard: { resize: "none" },
-        // Insets are applied natively in MainActivity; the page gets no CSS variables.
+        // MainActivity publishes the bar insets as --inset-*; the plugin's own handling resizes the page for the keyboard.
         SystemBars: { insetsHandling: "disable" },
         // The page hides the splash once rendered; the native timer covers a page that never does.
         SplashScreen: { launchAutoHide: true, launchShowDuration: 8000 },

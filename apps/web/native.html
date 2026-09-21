@@ -7,6 +7,9 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
   <title>Raven</title>
+  <!-- Canvas colour before first paint: a reload under the splash must not show white through the transparent status bar. -->
+  <style>html{background:#fff}@media (prefers-color-scheme:dark){html{background:#171717}}</style>
+  <script>try{var t=localStorage.getItem("raven-theme");if(t==="dark"||t==="light")document.documentElement.style.background=t==="dark"?"#171717":"#fff"}catch(e){}</script>
 </head>
 
 <body>
