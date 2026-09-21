@@ -72,7 +72,7 @@ export default function WorkspaceListView({ onOpenWorkspace }: { onOpenWorkspace
                     {_("Workspaces allow you to organize your channels and teams.")}
                 </SettingsPanelDescription>
             </SettingsPanelHeader>
-            <SettingsPanelContent className="min-h-0">
+            <SettingsPanelContent className="min-h-0 gap-2">
                 {error && <ErrorBanner error={error} />}
                 {isLoading && !error && (
                     <div className="flex flex-1 items-center justify-center">
@@ -163,7 +163,7 @@ function WorkspaceTypeCell({ type }: { type: WorkspaceFields["type"] }) {
  */
 function MembershipCell({ workspace }: { workspace: WorkspaceFields }) {
     if (workspace.is_admin) {
-        return <Badge variant="solid">{_("Admin")}</Badge>
+        return <Badge theme="blue">{_("Admin")}</Badge>
     }
     if (workspace.workspace_member_name) {
         return <Badge variant="subtle">{_("Member")}</Badge>

@@ -1,5 +1,5 @@
-import { useMemo, useSyncExternalStore } from "react"
-import { UsersIcon } from "lucide-react"
+import { useCallback, useDeferredValue, useMemo, useState, useSyncExternalStore } from "react"
+import { EllipsisVertical, KeyRoundIcon, SearchIcon, UsersIcon } from "lucide-react"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@components/ui/empty"
 import {
     SettingsPanelContent,
@@ -10,16 +10,37 @@ import {
 import { ListView, type ListViewColumnMeta } from "@components/ui/list-view"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@components/ui/badge"
+import { Button } from "@components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@components/ui/dropdown-menu"
+import { Input } from "@components/ui/input"
 import { UserAvatar } from "@components/features/message/UserAvatar"
 import { usersStore } from "@stores/usersStore"
 import { hasRole } from "@lib/permissions"
+import { isRavenSettingsAdmin } from "../AdminSettingsForm"
 import _ from "@lib/translate"
 import type { UserData } from "@db"
 import AddUserDialog from "./AddUserDialog"
+import ManageAccessDialog from "./ManageAccessDialog"
 
 /** Workspace → Users: everyone with access to Raven (bots excluded). */
 export const Users = () => {
     const usersMap = useSyncExternalStore(usersStore.subscribe, usersStore.getSnapshot)
+    // Inviting creates a Frappe User, which needs System Manager. Managing access only needs a Raven admin.
+    const canInvite = hasRole("System Manager")
+    const canManageAccess = isRavenSettingsAdmin()
+
+    // One dialog for the whole list. The user stays set while it closes so the exit animation has content.
+    const [accessUser, setAccessUser] = useState<UserData | null>(null)
+    const [accessOpen, setAccessOpen] = useState(false)
+    const openAccess = useCallback((user: UserData) => { setAccessUser(user); setAccessOpen(true) }, [])
+
+    const columns = useMemo<ColumnDef<UserData>[]>(
+        () => (canManageAccess ? [...userColumns, actionsColumn(openAccess)] : userColumns),
+        [canManageAccess, openAccess],
+    )
+    const [search, setSearch] = useState("")
+    // Filtering is in memory. Deferring keeps typing smooth on big user lists.
+    const query = useDeferredValue(search.trim().toLowerCase())
 
     const humanUsers = useMemo(
         () =>
@@ -29,19 +50,39 @@ export const Users = () => {
         [usersMap],
     )
 
+    // Match on name or email.
+    const visibleUsers = useMemo(
+        () => query
+            ? humanUsers.filter((user) => user.full_name?.toLowerCase().includes(query) || user.name.toLowerCase().includes(query))
+            : humanUsers,
+        [humanUsers, query],
+    )
+
     return (
         <>
-            <SettingsPanelHeader actions={hasRole("System Manager") ? <AddUserDialog /> : null}>
+            <SettingsPanelHeader actions={canInvite ? <AddUserDialog /> : null}>
                 <SettingsPanelTitle>{_("Users")}</SettingsPanelTitle>
                 <SettingsPanelDescription>{_("Manage users added to Raven.")}</SettingsPanelDescription>
             </SettingsPanelHeader>
-            <SettingsPanelContent className="min-h-0">
+            <SettingsPanelContent className="min-h-0 gap-2">
+                <div className="relative">
+                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-gray-4" aria-hidden="true" />
+                    <Input
+                        inputSize="sm"
+                        type="search"
+                        className="pl-9"
+                        placeholder={_("Search by name or email")}
+                        aria-label={_("Search users")}
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
                 <ListView
                     className="flex-1 min-h-0"
                     scrollAreaClassName="flex-1"
                     maxHeight="100%"
-                    data={humanUsers}
-                    columns={userColumns}
+                    data={visibleUsers}
+                    columns={columns}
                     getRowId={(row) => row.name}
                     rowHeight={44}
                     emptyState={
@@ -51,12 +92,17 @@ export const Users = () => {
                             </EmptyMedia>
                             <EmptyHeader>
                                 <EmptyTitle>{_("No users found")}</EmptyTitle>
-                                <EmptyDescription>{_("Users added to Raven will show up here.")}</EmptyDescription>
+                                <EmptyDescription>
+                                    {query
+                                        ? _("No users match your search.")
+                                        : _("Users added to Raven will show up here.")}
+                                </EmptyDescription>
                             </EmptyHeader>
                         </Empty>
                     }
                 />
             </SettingsPanelContent>
+            {accessUser && <ManageAccessDialog user={accessUser} open={accessOpen} onOpenChange={setAccessOpen} />}
         </>
     )
 }
@@ -100,5 +146,27 @@ const userColumns: ColumnDef<UserData>[] = [
             ) : null,
     },
 ]
+
+/** Kebab menu on a user row. Only admins see this column. */
+const actionsColumn = (onManageAccess: (user: UserData) => void): ColumnDef<UserData> => ({
+    id: "actions",
+    header: "",
+    meta: { gridWidth: "48px" } satisfies ListViewColumnMeta,
+    cell: ({ row }) => (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="sm" isIconButton aria-label={_("User actions")}>
+                    <EllipsisVertical />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onManageAccess(row.original)}>
+                    <KeyRoundIcon />
+                    {_("Manage access")}
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    ),
+})
 
 export default Users

@@ -3,6 +3,7 @@ import { Virtuoso } from 'react-virtuoso'
 import { MessageSquareMore } from 'lucide-react'
 import _ from '@lib/translate'
 import { FileImage } from '@components/common/FileImage'
+import { getMessageAuthorId } from '@utils/messageUtils'
 import { formatRelativeDate } from '@lib/date'
 import { useSqliteSearch, SearchResult } from '@hooks/useSqliteSearch'
 import { useMessageRowLookups } from '@hooks/useMessageRowLookups'
@@ -65,7 +66,7 @@ const SearchFileResults = ({ searchValue, filters, onSelect, selectedID }: Searc
                 return (
                     <FileResultRow
                         file={file}
-                        user={usersById.get(file.author)}
+                        user={usersById.get(getMessageAuthorId(file, file.author))}
                         channel={channel}
                         dmChannel={dmChannel}
                         peer={peer}

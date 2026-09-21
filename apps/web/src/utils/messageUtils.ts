@@ -52,6 +52,15 @@ export type LastMessageDetails = {
     bot?: string | null
 }
 
+/**
+ * The user to show as a message's author. A bot message is owned by the Frappe user
+ * the bot posts as, so the bot is the author, not the owner. Same rule as the stream.
+ */
+export const getMessageAuthorId = (
+    message: { is_bot_message?: 0 | 1 | null; bot?: string | null },
+    owner: string,
+): string => (message.is_bot_message ? message.bot || owner : owner)
+
 const parseLastMessageDetails = (raw: unknown): LastMessageDetails | null => {
     if (!raw) return null
     try {

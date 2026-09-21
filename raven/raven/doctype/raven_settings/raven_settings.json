@@ -209,7 +209,7 @@
    "label": "Push Notifications"
   },
   {
-   "default": "Frappe Cloud",
+   "default": "Raven",
    "fieldname": "push_notification_service",
    "fieldtype": "Select",
    "label": "Push Notification Service",
@@ -334,7 +334,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-18 12:12:06.954523",
+ "modified": "2026-09-18 12:12:06.954523",
  "modified_by": "Administrator",
  "module": "Raven",
  "name": "Raven Settings",

@@ -2,7 +2,6 @@ import { MessageContent } from "@components/features/message/renderers/MessageCo
 import { DocumentLinkInline } from "@components/features/message/renderers/DocumentLinkRenderer"
 import { UserAvatar } from "@components/features/message/UserAvatar"
 import { ThreadChannelDetails } from "@components/features/threads/ThreadsList"
-import { Badge } from "@components/ui/badge"
 import { GroupedAvatars } from "@components/ui/grouped-avatars"
 import { UserData } from "@db"
 import { cn } from "@lib/utils"
@@ -73,9 +72,6 @@ export const BaseThreadMessage = ({
                         {_(`${count} ${count === 1 ? 'Reply' : 'Replies'}`)}
                     </span>
                 ) : null}
-                {isUnread && (
-                    <Badge variant="solid" className="w-1 h-1 p-0 min-w-0 rounded-full mt-0.5" aria-label={_("Unread")} />
-                )}
             </div>
         </div>
     )

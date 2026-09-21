@@ -23,6 +23,7 @@ import ErrorBanner from "@components/ui/error-banner"
 import { Bot, CheckCheck, MessagesSquare, Search } from "lucide-react"
 import type { ChannelListItem, DMChannelListItem } from "@raven/types/common/ChannelListItem"
 import _ from "@lib/translate"
+import { getMessageAuthorId } from "@utils/messageUtils"
 
 interface ThreadsListProps {
     threadType?: "participating" | "other" | "ai"
@@ -94,7 +95,7 @@ const ThreadRow = memo(function ThreadRow({
     const dmChannel = dmById.get(thread.channel_id)
     const channel = channelById.get(thread.channel_id)
     const peer = dmChannel?.peer_user_id ? usersById.get(dmChannel.peer_user_id) : undefined
-    const user = usersById.get(thread.owner) ?? null
+    const user = usersById.get(getMessageAuthorId(thread, thread.owner)) ?? null
 
     // Members + reply count come from the stores, lazily. A regular channel thread fetches its
     // details (members + count) ONCE the row actually scrolls into view — gated on
@@ -127,7 +128,7 @@ const ThreadRow = memo(function ThreadRow({
             return {
                 channelName: channel.channel_name || channel.name,
                 channelIcon: (
-                    <ChannelIcon type={channel.type as "Public" | "Private" | "Open"} className="h-3.5 w-3.5" />
+                    <ChannelIcon type={channel.type as "Public" | "Private" | "Open"} className="h-4 w-4" />
                 ),
                 isDirectMessage: false,
                 participants: members,
@@ -264,8 +265,8 @@ export default function ThreadsList({
                             {onlyShowUnread
                                 ? _("There are no unread threads to show. Clear the filter to see all threads.")
                                 : threadType === "ai"
-                                  ? _("AI threads will appear here when you start conversations with an AI bot.")
-                                  : _("Create a thread by right-clicking a message and selecting 'Create Thread'.")}
+                                    ? _("AI threads will appear here when you start conversations with an AI bot.")
+                                    : _("Create a thread by right-clicking a message and selecting 'Create Thread'.")}
                         </EmptyDescription>
                     </EmptyHeader>
                 </Empty>

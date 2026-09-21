@@ -1,4 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select"
+import { SAVE_TOAST_ID } from "@lib/toast"
 import { Separator } from "@components/ui/separator"
 import { SettingsPanelDescription, SettingsPanelHeader, SettingsPanelTitle, SettingsPanelContent, SettingsFormLabel, SettingsFormDescription, SettingsFormRow, SettingsSectionHeader } from "@components/ui/settings-dialog"
 import { Switch } from "@components/ui/switch"
@@ -22,6 +23,7 @@ import { errorResponseToast } from "@components/ui/error-banner"
 import { LinkSettingsAdminSection } from "./LinkSettingsAdminSection"
 import { QuietHoursAdminSection } from "./QuietHoursAdminSection"
 import { Fragment } from "react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@components/ui/tooltip"
 
 const Preferences = () => {
 
@@ -50,9 +52,7 @@ const Preferences = () => {
                 setQuietHoursNudge(value as QuietHoursNudge)
             }
             mutate()
-            toast.success(_("Settings updated"), {
-                id: "preferences-updated"
-            })
+            toast.success(_("Settings updated"), { id: SAVE_TOAST_ID })
         }).catch((e) => {
             errorResponseToast(_("Could not update preference"), e)
         })
@@ -277,6 +277,29 @@ const QuickEmojis = () => {
             <SettingsFormDescription>
                 {_("Set your favorite emojis for quick reactions.")}
             </SettingsFormDescription>
+            {showSuggestions && (
+                <div className="flex items-center pt-1 gap-1">
+                    <span className="text-p-sm text-ink-gray-5">{_("Suggested based on your recent usage")}</span>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label={_("Use your most-used emojis as quick reactions")}
+                                onClick={applySuggestions}
+                            >
+                                {suggestions.map((suggestion) => (
+                                    <EmojiFace key={suggestion.id} emoji={suggestion} />
+                                ))}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            {_("Click to apply these emojis as your quick reactions")}
+                        </TooltipContent>
+                    </Tooltip>
+
+                </div>
+            )}
         </div>
         <div className="flex flex-col items-end">
             <div className="flex gap-2">
@@ -306,21 +329,6 @@ const QuickEmojis = () => {
                     </Fragment>
                 ))}
             </div>
-            {showSuggestions && (
-                <div className="flex items-center pt-1">
-                    <span className="text-sm text-ink-gray-5">{_("Suggested:")}</span>
-                    <Button
-                        variant="ghost"
-                        size="md"
-                        aria-label={_("Use your most-used emojis as quick reactions")}
-                        onClick={applySuggestions}
-                    >
-                        {suggestions.map((suggestion) => (
-                            <EmojiFace key={suggestion.id} emoji={suggestion} />
-                        ))}
-                    </Button>
-                </div>
-            )}
         </div>
     </SettingsFormRow>
 }

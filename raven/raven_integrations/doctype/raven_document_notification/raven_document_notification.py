@@ -1,5 +1,7 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
+import html
+import re
 from collections import namedtuple
 
 import frappe
@@ -59,7 +61,22 @@ class RavenDocumentNotification(Document):
 				)
 
 	def validate_message(self):
-		validate_template(self.message)
+		validate_template(self.get_message_template())
+
+	def is_html_message(self) -> bool:
+		"""New records come from a rich-text editor and are stored as HTML. Older ones are markdown."""
+		return bool(re.search(r"<[a-zA-Z]", self.message or ""))
+
+	def get_message_template(self) -> str:
+		"""
+		The message as a Jinja template. A rich-text editor HTML-escapes the text inside
+		Jinja tags, turning `{% if doc.total > 100 %}` into `&gt;`, which Jinja cannot
+		parse. Entities are unescaped inside the tags only; the surrounding HTML stays as is.
+		"""
+		template = self.message or ""
+		if not self.is_html_message():
+			return template
+		return re.sub(r"({{.*?}}|{%.*?%})", lambda m: html.unescape(m.group(0)), template, flags=re.S)
 
 	def validate_document_type(self):
 		if self.document_type in FORBIDDEN_DOCUMENT_TYPES:
@@ -107,7 +124,12 @@ class RavenDocumentNotification(Document):
 
 		channels, users = self.get_recipients(context)
 
-		message = frappe.render_template(self.message, context)
+		is_html = self.is_html_message()
+		message = frappe.render_template(self.get_message_template(), context)
+		# HTML is sent as is, after rendering so document values cannot inject markup either.
+		# Markdown (older records) is converted by the bot.
+		if is_html:
+			message = frappe.utils.sanitize_html(message)
 
 		for channel in channels:
 			bot.send_message(
@@ -115,7 +137,7 @@ class RavenDocumentNotification(Document):
 				text=message,
 				link_doctype=link_doctype if not self.do_not_attach_doc else None,
 				link_document=link_document if not self.do_not_attach_doc else None,
-				markdown=True,
+				markdown=not is_html,
 				notification_name=self.name,
 			)
 
@@ -125,7 +147,7 @@ class RavenDocumentNotification(Document):
 				text=message,
 				link_doctype=link_doctype if not self.do_not_attach_doc else None,
 				link_document=link_document if not self.do_not_attach_doc else None,
-				markdown=True,
+				markdown=not is_html,
 				notification_name=self.name,
 			)
 

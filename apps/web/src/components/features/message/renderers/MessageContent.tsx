@@ -19,6 +19,7 @@ import SearchTextRenderer from "./SearchTextRenderer"
 import { MessageReactionsRow } from "./MessageReactions"
 import { DocumentLinkRenderer } from "./DocumentLinkRenderer"
 import { getAttachmentKind } from "@utils/attachmentPreview"
+import { escapeHtml } from "@utils/htmlUtils"
 import { parseRepliedMessageDetails } from "@utils/messageUtils"
 import type { RepliedMessageDetails } from "./RepliedMessagePreview"
 import _ from "@lib/translate"
@@ -91,10 +92,6 @@ export const EditableMessageBody = ({ message, bubble = false }: { message: Mess
     if (message.is_edited === 1 && message.text?.trim()) return <EditedMessageBody text={message.text} bubble={bubble} />
     return <MessageBody content={message.text} bubble={bubble} />
 }
-
-/** Escape the translated label before it goes into the message HTML. */
-const escapeHtml = (value: string) =>
-    value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
 /**
  * The body with a small "(edited)" marker, Slack style. A message ending in a

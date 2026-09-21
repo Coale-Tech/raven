@@ -179,9 +179,20 @@ scheduler_events = {
 		"raven.raven_cloud_notifications.sync_users_tokens_to_raven_cloud",
 	],
 	"cron": {
-		# run every 5 minutes
-		"*/5 * * * *": ["raven.scheduler.close_expired_polls.close_expired_polls"]
+		# run every 5 minutes. Reminder and scheduled message times are aligned to this
+		# grid in their validate methods, so both fire on time.
+		"*/5 * * * *": [
+			"raven.scheduler.close_expired_polls.close_expired_polls",
+			"raven.scheduler.send_reminders.send_due_reminders",
+			"raven.scheduler.send_scheduled_messages.send_due_messages",
+		],
 	},
+}
+
+# Auto-registered in Log Settings; each doctype's clear_old_logs does the deletion.
+default_log_clearing_doctypes = {
+	"Raven Reminder": 30,
+	"Raven Scheduled Message": 30,
 }
 
 # Testing
@@ -210,7 +221,7 @@ scheduler_events = {
 # Ignore links to specified DocTypes when deleting documents
 # -----------------------------------------------------------
 
-ignore_links_on_delete = ["Raven Message"]
+ignore_links_on_delete = ["Raven Message", "Raven Reminder", "Raven Scheduled Message"]
 
 
 # User Data Protection
@@ -246,17 +257,8 @@ ignore_links_on_delete = ["Raven Message"]
 
 additional_timeline_content = {"*": ["raven.api.raven_message.get_timeline_message_content"]}
 
-# /raven serves the v3 app; the old (v2) app lives on at /raven_v2.
 website_route_rules = [
 	{"from_route": "/raven/<path:app_path>", "to_route": "raven"},
-	{"from_route": "/raven_v2/<path:app_path>", "to_route": "raven_v2"},
-]
-
-# v3 lived at /raven_v3 during the beta — installed PWAs and shared links from
-# that era land on the real mount. Regex source with a capture so deep links
-# keep their path.
-website_redirects = [
-	{"source": r"/raven_v3(/.*)?", "target": r"/raven\1"},
 ]
 
 # Serves the v3 service worker at /raven/sw.js (in-scope for page control —

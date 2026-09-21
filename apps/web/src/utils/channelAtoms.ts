@@ -78,7 +78,7 @@ export const linkedDocumentAtom = atomFamily((_channelID: string) => atom<Linked
  */
 export const editingMessageAtom = atomFamily((_channelID: string) => atom<string | null>(null))
 
-export type MessageDialogType = "delete" | "forward" | "reactions" | "read-receipts" | "attach-document"
+export type MessageDialogType = "delete" | "forward" | "reactions" | "read-receipts" | "attach-document" | "reminder"
 
 export type MessageDialog =
     | { type: MessageDialogType; message: Message }

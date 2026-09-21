@@ -7,13 +7,14 @@ import { KeyboardMetaKeyIcon } from "@components/ui/keyboard-keys"
 import { Separator } from "@components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@components/ui/tooltip"
 import { useUnreadNotificationsCount } from "@hooks/useNotifications"
+import { useUnreadReminderCount } from "@components/features/reminders/useReminders"
 import { useWorkspaces, type WorkspaceFields } from "@hooks/useWorkspaces"
 import { useDMUnread, useWorkspaceUnread } from "@stores/unread/useChannelUnread"
 import { useUnreadThreadsCount } from "@stores/threads/useUnreadThreads"
 import _ from "@lib/translate"
 import { cn } from "@lib/utils"
-import { useSetAtom } from "jotai"
-import { BellIcon, BookmarkIcon, MessageSquareTextIcon, MoreHorizontalIcon, SearchIcon, UsersIcon } from "lucide-react"
+import { useAtom, useSetAtom } from "jotai"
+import { BellIcon, BookmarkIcon, CalendarClockIcon, MessageSquareTextIcon, MoreHorizontalIcon, SearchIcon, UsersIcon } from "lucide-react"
 import { NavLink } from "react-router"
 import { settingsDialogOpenTab } from "@components/features/settings/settingsDialogAtom"
 import { useMemo } from "react"
@@ -22,6 +23,8 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities"
 import { useFrappeUpdateDoc } from "frappe-react-sdk"
 import useCurrentRavenUser from "@raven/lib/hooks/useCurrentRavenUser"
+import ScheduledMessagesDialog from "@components/features/schedule-send/ScheduledMessagesDialog"
+import { scheduledMessagesDialogOpenAtom, useScheduledMessagesCount } from "@components/features/schedule-send/useScheduledMessages"
 
 /**
  * Dropping a drag makes the browser fire ONE click on whatever ends up under
@@ -73,7 +76,8 @@ const PrimarySidebar = () => {
                     <div className="px-3.5 w-full">
                         <Separator />
                     </div>
-                    <SavedMessageLink />
+                    <ScheduledMessagesButton />
+                    <LaterLink />
                     <NavUserMenu />
                 </div>
             </div>
@@ -105,6 +109,30 @@ const SearchButton = () => {
     </Tooltip>
 }
 
+const ScheduledMessagesButton = () => {
+    const count = useScheduledMessagesCount()
+    // Shared with the composer banner's View action, which opens this same dialog.
+    const [open, setOpen] = useAtom(scheduledMessagesDialogOpenAtom)
+    // The icon may hide when the count hits 0, but a mounted open dialog stays
+    // mounted until the user closes it — sending/deleting the last row (or a
+    // background dispatch) must not yank it away mid-use.
+    if (count === 0 && !open) return null
+    return (
+        <>
+            {/* Same anatomy as the NavLink icons: IconBox owns the tooltip and the
+                32px inner box the badge anchors to, so alignment matches exactly. */}
+            <button type="button" aria-label={_("Scheduled Messages")} onClick={() => setOpen(true)}>
+                <IconBox title={_("Scheduled Messages")}>
+                    <CalendarClockIcon />
+                    {/* Gray, not red — a scheduled count is informational, not attention-seeking. */}
+                    <UnreadBadge count={count} theme="gray" />
+                </IconBox>
+            </button>
+            <ScheduledMessagesDialog open={open} onOpenChange={setOpen} />
+        </>
+    )
+}
+
 const IconBox = ({ children, isActive, title }: { children: React.ReactNode, isActive?: boolean, title?: string }) => {
     return <Tooltip>
         <TooltipTrigger asChild>
@@ -132,14 +160,19 @@ const ActivePill = ({ isActive }: { isActive?: boolean }) => {
     )} />
 }
 
-const UnreadBadge = ({ count }: { count?: number }) => {
+const UnreadBadge = ({ count, theme = "red" }: { count?: number, theme?: "red" | "gray" }) => {
 
     if (!count || count === 0) return null
 
     // Pill, not a fixed circle: a single digit stays circular (min-w == height),
     // but "9+" / two digits grow horizontally with px-1 so the glyphs aren't
     // crushed against the boundary. h-4 keeps the cap height stable either way.
-    return <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-surface-red-6 dark:bg-surface-red-6 text-ink-base dark:text-ink-red-1 text-[10px] leading-none">
+    return <span className={cn(
+        "absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 flex items-center justify-center rounded-full text-[10px] leading-none",
+        theme === "red"
+            ? "bg-surface-red-6 dark:bg-surface-red-6 text-ink-base dark:text-ink-red-1"
+            : "bg-surface-gray-6 text-ink-base",
+    )}>
         {count > 9 ? "9+" : count}
     </span>
 
@@ -185,11 +218,15 @@ const ThreadsLink = () => {
     </NavLink>
 }
 
-const SavedMessageLink = () => {
-    return <NavLink to="saved-messages">
+const LaterLink = () => {
+    // Fired-but-unread reminders — cleared as they're opened on the In progress tab.
+    const unread = useUnreadReminderCount()
+
+    return <NavLink to="later">
         {({ isActive }) => (
-            <IconBox isActive={isActive} title={_("Saved Messages")}>
+            <IconBox isActive={isActive} title={_("Later")}>
                 <BookmarkIcon />
+                <UnreadBadge count={unread} />
             </IconBox>
         )}
     </NavLink>

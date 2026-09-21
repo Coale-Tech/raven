@@ -1,10 +1,10 @@
 import { FieldValues, RegisterOptions, useFormContext } from "react-hook-form"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, FormRequiredIndicator } from "@components/ui/form"
 import _ from "@lib/translate"
+import ClearFieldButton from "@components/common/ClearFieldButton"
 import { Input } from "./input"
 import { ComponentProps, useState } from "react"
-import { parseDate } from "chrono-node"
-import { formatDate, USER_DATE_FORMAT, toDate } from "@lib/date"
+import { formatDate, parseTypedDate, USER_DATE_FORMAT, toDate } from "@lib/date"
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
 import { Button } from "./button"
 import { CalendarIcon } from "lucide-react"
@@ -22,7 +22,7 @@ interface FormElementProps {
     label: string,
     isRequired?: boolean,
     disabled?: boolean,
-    formDescription?: string,
+    formDescription?: React.ReactNode,
     hideLabel?: boolean,
     readOnly?: boolean,
 
@@ -54,10 +54,16 @@ export const DataField = ({ name, rules, label, isRequired, formDescription, inp
 }
 
 interface SelectFieldProps extends FormElementProps {
+    /** Show a clear (×) button in place of the chevron while a value is picked. */
+    clearable?: boolean
+    placeholder?: string
+    /** Cap/style the dropdown, e.g. "max-w-[360px]" for long option labels. */
+    dropdownClassName?: string
+    dropdownAlign?: "start" | "center" | "end"
     children: React.ReactNode
 }
 
-export const SelectFormField = ({ name, rules, label, isRequired, formDescription, hideLabel, children, disabled, readOnly }: SelectFieldProps) => {
+export const SelectFormField = ({ name, rules, label, isRequired, formDescription, hideLabel, children, disabled, readOnly, clearable, placeholder, dropdownClassName, dropdownAlign }: SelectFieldProps) => {
 
     const { control } = useFormContext()
 
@@ -66,25 +72,32 @@ export const SelectFormField = ({ name, rules, label, isRequired, formDescriptio
         name={name}
         disabled={disabled}
         rules={rules}
-        render={({ field }) => (
+        render={({ field }) => {
+            const showClear = Boolean(clearable && field.value && !disabled && !readOnly)
+            return (
             <FormItem>
                 <FormLabel className={hideLabel ? 'sr-only' : ''}>{label}{isRequired && <FormRequiredIndicator />}</FormLabel>
-                <FormControl>
+                {/* The inner FormControl (around SelectTrigger) carries the a11y wiring; no outer one.
+                    min-w-0: FormItem is a grid — without it a long nowrap value widens the column. */}
+                <div className="relative min-w-0">
                     <Select onValueChange={field.onChange} value={field.value} disabled={disabled || readOnly} aria-readonly={readOnly}>
                         <FormControl>
-                            <SelectTrigger className="w-full">
-                                <SelectValue />
+                            {/* svg:last-child = Radix's chevron; the clear × takes its slot. */}
+                            <SelectTrigger className={showClear ? "w-full pr-7 [&>svg:last-child]:hidden" : "w-full"}>
+                                <SelectValue placeholder={placeholder} />
                             </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
+                        <SelectContent className={dropdownClassName} align={dropdownAlign}>
                             {children}
                         </SelectContent>
                     </Select>
-                </FormControl>
+                    {showClear ? <ClearFieldButton onClick={() => field.onChange("")} /> : null}
+                </div>
                 {formDescription && <FormDescription>{formDescription}</FormDescription>}
                 <FormMessage />
             </FormItem>
-        )}
+            )
+        }}
     />
 }
 
@@ -118,17 +131,10 @@ export const DateField = ({ name, rules, label, isRequired, formDescription, inp
                     onChange={(e) => {
                         setValue(e.target.value)
                         if (e.target.value) {
-                            // On change in value, try computing date usning standard formats first
-                            const dateObj = toDate(e.target.value, userDateFormat)
-                            // If we find a valid date, use it
-                            if (dateObj && !isNaN(dateObj.getTime())) {
-                                field.onChange(formatDate(dateObj, "YYYY-MM-DD"))
-                            } else {
-                                // If not, try parsing using chrono-node for things like "1st July 2025"
-                                const date = parseDate(e.target.value)
-                                if (date) {
-                                    field.onChange(formatDate(date, "YYYY-MM-DD"))
-                                }
+                            // Strict user-format parse first, then natural language
+                            const parsed = parseTypedDate(e.target.value)
+                            if (parsed) {
+                                field.onChange(formatDate(parsed, "YYYY-MM-DD"))
                             }
                         } else {
                             field.onChange("")
@@ -261,7 +267,7 @@ export const SwitchFormField = ({ name, rules, label, formDescription, disabled,
         disabled={disabled}
         rules={rules}
         render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between gap-4">
+            <FormItem className="flex flex-row items-start justify-between gap-4">
                 <div className="space-y-0.5">
                     <FormLabel>{label}</FormLabel>
                     {formDescription && <FormDescription>{formDescription}</FormDescription>}

@@ -1,11 +1,15 @@
 from urllib.parse import urlsplit
 
 import frappe
+from frappe.utils.safe_exec import is_safe_exec_enabled
 
 
 def boot_session(bootinfo):
 
 	raven_settings = frappe.get_single("Raven Settings")
+
+	# Scheduled messages run as Server Scripts. The settings panel warns when those are off.
+	bootinfo.server_script_enabled = is_safe_exec_enabled()
 
 	bootinfo.show_raven_chat_on_desk = raven_settings.show_raven_on_desk
 

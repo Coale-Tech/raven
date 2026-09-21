@@ -627,6 +627,8 @@ def search_links(
 			message.channel_id,
 			message.creation,
 			message.owner.as_("author"),
+			message.is_bot_message,
+			message.bot,
 			message.content,
 			channel.is_direct_message,
 			channel.is_thread,

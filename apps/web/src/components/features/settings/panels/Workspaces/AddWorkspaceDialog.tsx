@@ -1,4 +1,5 @@
 import { useState } from "react"
+import useCreateHotkey from "@hooks/useCreateHotkey"
 import { Controller, useForm } from "react-hook-form"
 import { useFrappeCreateDoc, useFrappeFileUpload, useFrappeUpdateDoc, useSWRConfig } from "frappe-react-sdk"
 import { toast } from "sonner"
@@ -20,7 +21,6 @@ import { Label } from "@components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@components/ui/radio-group"
 import { FileDropzone } from "@components/ui/file-dropzone"
 import ErrorBanner from "@components/ui/error-banner"
-import { Spinner } from "@components/ui/spinner"
 import { hasRole } from "@lib/permissions"
 import type { RavenWorkspace } from "@raven/types/Raven/RavenWorkspace"
 import _ from "@lib/translate"
@@ -33,6 +33,7 @@ type WorkspaceFormData = RavenWorkspace & {
 /** "Create" in the Workspaces panel header; jumps to the new workspace's detail view on success. */
 const CreateWorkspaceButton = ({ onCreated }: { onCreated: (workspaceID: string) => void }) => {
     const [open, setOpen] = useState(false)
+    useCreateHotkey(() => setOpen(true))
     const isRavenAdmin = hasRole("Raven Admin")
 
     return (
@@ -156,9 +157,8 @@ const AddWorkspaceForm = ({ onClose }: { onClose: (workspaceID?: string) => void
                     <DialogClose asChild>
                         <Button size="md" type="button" variant="outline" disabled={loading}>{_("Cancel")}</Button>
                     </DialogClose>
-                    <Button size="md" type="submit" disabled={loading}>
-                        {loading && <Spinner />}
-                        {loading ? _("Saving") : _("Save")}
+                    <Button size="md" type="submit" loading={loading} loadingText={_("Saving...")}>
+                        {_("Save")}
                     </Button>
                 </DialogFooter>
             </form>

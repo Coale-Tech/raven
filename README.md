@@ -191,7 +191,7 @@ bench --site raven.test set-config ignore_csrf 1
 
 ##### Web App
 
-Raven's **web app** is a React based single page app located in the `/frontend` directory. It uses Vite to compile the app.
+Raven's **web app** is a React based single page app located in the `/apps/web` directory. It uses Vite to compile the app.
 If you want to make changes to the frontend with hot reloading, follow the steps below:
 
 1. Navigate to the apps/raven folder in your bench directory
@@ -203,7 +203,7 @@ cd apps/raven
 yarn run dev
 ```
 
-This will start a local server at `http://localhost:8080` where the frontend app can be previewed in real time as you make changes. To make sure the setup works correctly, add a `.env.local` file in the `/frontend` directory with the following contents:
+This will start a local server at `http://localhost:8080` where the frontend app can be previewed in real time as you make changes. To make sure the setup works correctly, add a `.env.local` file in the `/apps/web` directory with the following contents:
 
 ```
 VITE_BASE_NAME='' # This needs to be set as empty

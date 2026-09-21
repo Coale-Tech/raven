@@ -56,8 +56,14 @@ class RavenChannel(Document):
 		# delete all messages when channel is deleted
 		frappe.db.delete("Raven Message", {"channel_id": self.name})
 
+		# delete all scheduled messages when channel is deleted
+		frappe.db.delete("Raven Scheduled Message", {"channel_id": self.name})
+
 		# delete all reactions when channel is deleted
 		frappe.db.delete("Raven Message Reaction", {"channel_id": self.name})
+
+		# delete all reminders anchored in this channel
+		frappe.db.delete("Raven Reminder", {"channel_id": self.name})
 
 		# Delete the pinned channels
 		frappe.db.delete("Raven Pinned Channels", {"channel_id": self.name})

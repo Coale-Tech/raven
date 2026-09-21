@@ -3,7 +3,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from '@componen
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@components/ui/command'
 import _ from '@lib/translate'
 import { defaultFilter } from 'cmdk'
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { useNavigate } from 'react-router-dom'
 import { ArrowDownIcon, ArrowUpIcon, CornerDownLeftIcon, TextSearch } from 'lucide-react'
@@ -18,6 +18,7 @@ import NavigationList from './NavigationList'
 import { commandMenuOpenAtom } from './atoms'
 import { useHistoryBackClose } from '@hooks/useHistoryBackClose'
 import { useNavigateFromDrawer } from '@hooks/useNavigateFromDrawer'
+import { useResetScrollOnSearch } from '@hooks/useResetScrollOnSearch'
 import { useChannel } from '@hooks/useChannel'
 import { useUser } from '@hooks/useUser'
 import { ChannelIcon } from '@components/common/ChannelIcon/ChannelIcon'
@@ -111,7 +112,9 @@ const CommandPalette = ({ inDrawer = false }: { inDrawer?: boolean }) => {
     // so the sheet can't get baked into the OS back-swipe screenshot.
     const navigateFromDrawer = useNavigateFromDrawer(() => setOpen(false))
     const location = useLocation()
-    const listRef = useRef<HTMLDivElement>(null)
+    // Every keystroke re-filters, but cmdk keeps the list's old scroll offset. Without
+    // this, scrolling down and typing more left the auto-selected first result above the fold.
+    const listRef = useResetScrollOnSearch(text)
 
     // The current channel comes from the URL, parsed by hand — NOT useParams:
     // the palette mounts at the AppShell root, and useParams only sees params
@@ -170,14 +173,7 @@ const CommandPalette = ({ inDrawer = false }: { inDrawer?: boolean }) => {
                 variant="palette"
                 autoFocus={!isMobile}
                 value={text}
-                onValueChange={(v) => {
-                    setText(v.slice(0, 140))
-                    // Every keystroke re-filters, but cmdk keeps the list's old
-                    // scroll offset — so after scrolling down and typing more, the
-                    // auto-selected FIRST result sat above the fold. Jump back to
-                    // the top whenever the query changes.
-                    listRef.current?.scrollTo({ top: 0 })
-                }}
+                onValueChange={(v) => setText(v.slice(0, 140))}
                 maxLength={140}
                 placeholder={isMobile ? _("Search") : _("Search or type a command")}
             />

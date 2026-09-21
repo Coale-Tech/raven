@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react"
 import { useFrappeAuth, type FrappeError } from "frappe-react-sdk"
+import Cookies from "js-cookie"
 import { errorResponseToast } from "@components/ui/error-banner"
 import { disablePush } from "@lib/push"
 import { db } from "@db"
@@ -22,6 +23,16 @@ const LOCAL_STORAGE_PREFIXES = [
     "firebase_token_", // push token (already unsubscribed by disablePush, this is belt-and-braces)
     "emoji-mart", // emoji-mart's own frequently-used tracking (emoji-mart.last / .frequently)
 ]
+
+/**
+ * Whether the server has already ended the session. Frappe writes its cookie clears
+ * even on an error response, so after a logout call the cookies say what actually
+ * happened regardless of the status code. Same check Desk's request layer makes.
+ */
+const sessionIsGone = () => {
+    const userID = Cookies.get("user_id")
+    return !userID || userID === "Guest"
+}
 
 /** Device-level appearance, not user data — keep it so login doesn't flash themes. */
 const LOCAL_STORAGE_KEEP = ["raven-theme"]
@@ -109,9 +120,16 @@ export function useLogout(): { logout: () => Promise<void>; isLoggingOut: boolea
         try {
             await frappeLogout()
         } catch (e) {
-            setIsLoggingOut(false)
-            errorResponseToast(_("Could not log out"), e as FrappeError)
-            return
+            // The logout endpoint can fail AFTER it has deleted the session and cleared
+            // the cookies: it ends by starting a Guest session, and a site whose Guest
+            // user is missing or disabled throws right there. The user is logged out
+            // all the same, and Desk treats that case as a session expiry rather than an
+            // error. Only a session that survived the call is a real failure.
+            if (!sessionIsGone()) {
+                setIsLoggingOut(false)
+                errorResponseToast(_("Could not log out"), e as FrappeError)
+                return
+            }
         }
 
         clearLocalStorage()

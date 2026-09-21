@@ -200,7 +200,6 @@ export const UserAvatar = memo<UserAvatarProps>(({
                 <AvatarImage
                     src={user.user_image && siteUrl(user.user_image)}
                     alt={`${displayName}'s profile picture`}
-                    loading="lazy"
                     className={!user.enabled ? 'grayscale' : ''}
                 />
                 <AvatarFallback

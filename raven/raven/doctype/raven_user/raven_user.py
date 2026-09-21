@@ -120,6 +120,12 @@ class RavenUser(Document):
 		Remove the Raven User from all channels
 		"""
 		frappe.db.delete("Raven Channel Member", {"user_id": self.user})
+		# Raven Reminder.user links this doc by name (not the frappe user id)
+		frappe.db.delete("Raven Reminder", {"user": self.name})
+		# Scheduled messages are owned by the frappe user. Left behind, the sweep would
+		# try to send them as a user who no longer exists on every run. Bots have no user.
+		if self.user:
+			frappe.db.delete("Raven Scheduled Message", {"owner": self.user})
 
 	def after_delete(self):
 		"""
