@@ -23,6 +23,7 @@ let package = Package(
         .package(name: "CapacitorSplashScreen", path: "../../../../../node_modules/@capacitor/splash-screen"),
         .package(name: "CapacitorStatusBar", path: "../../../../../node_modules/@capacitor/status-bar"),
         .package(name: "CapawesomeCapacitorBadge", path: "../../../../../node_modules/@capawesome/capacitor-badge"),
+        .package(name: "CapawesomeCapacitorFilePicker", path: "../../../../../node_modules/@capawesome/capacitor-file-picker"),
         .package(name: "CapacitorSecureStoragePlugin", path: "../../../../../node_modules/capacitor-secure-storage-plugin"),
         .package(name: "SendIntent", path: "../../../../../node_modules/send-intent")
     ],
@@ -43,6 +44,7 @@ let package = Package(
                 .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
                 .product(name: "CapacitorStatusBar", package: "CapacitorStatusBar"),
                 .product(name: "CapawesomeCapacitorBadge", package: "CapawesomeCapacitorBadge"),
+                .product(name: "CapawesomeCapacitorFilePicker", package: "CapawesomeCapacitorFilePicker"),
                 .product(name: "CapacitorSecureStoragePlugin", package: "CapacitorSecureStoragePlugin"),
                 .product(name: "SendIntent", package: "SendIntent")
             ]

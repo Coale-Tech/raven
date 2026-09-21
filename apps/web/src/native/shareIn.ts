@@ -78,7 +78,7 @@ export const pendingShareToParams = (share: PendingShare): URLSearchParams => {
 export const loadNativeShare = async (): Promise<URLSearchParams> => {
     const share = await takePendingShare()
     if (!share) return new URLSearchParams()
-    stashSharedFiles(await readSharedFiles(share))
+    stashSharedFiles(await readNativeFiles(share.files ?? []))
     return pendingShareToParams(share)
 }
 
@@ -94,17 +94,20 @@ const takePendingShare = async (): Promise<PendingShare | null> => {
     }
 }
 
-/** Reads each shared uri into a File through the WebView's file route: bytes arrive as a Blob, never base64. */
-const readSharedFiles = async (share: PendingShare): Promise<File[]> => {
-    if (!share.files?.length) return []
+/** Reads each native uri into a File through the WebView's file route: bytes arrive as a Blob, never base64. */
+export const readNativeFiles = async (files: NonNullable<PendingShare["files"]>): Promise<File[]> => {
+    if (!files.length) return []
     const { Capacitor } = await import("@capacitor/core")
-    const results = await Promise.allSettled(
-        share.files.map(async (f) => {
-            // Share payloads hand back percent-encoded content:// and file:// URIs.
-            const response = await fetch(Capacitor.convertFileSrc(decodeURIComponent(f.uri)))
-            if (!response.ok) throw new Error(String(response.status))
-            return new File([await response.blob()], f.name ?? "shared", { type: f.type ?? "application/octet-stream" })
-        }),
-    )
-    return results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []))
+    const read: File[] = []
+    // One at a time: each file passes through memory whole, and a pick can hold several large videos.
+    for (const f of files) {
+        try {
+            // The uri stays percent-encoded as the plugins hand it over: decoded, a # ? or % of the file name reads as URL syntax.
+            const response = await fetch(Capacitor.convertFileSrc(f.uri))
+            // Status 0 is a success here: Capacitor's iOS route answers video and audio without an HTTP status.
+            if (!response.ok && response.status !== 0) continue
+            read.push(new File([await response.blob()], f.name ?? "shared", { type: f.type ?? "application/octet-stream" }))
+        } catch { /* an unreadable file is dropped; the rest still attach */ }
+    }
+    return read
 }

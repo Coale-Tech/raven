@@ -23,6 +23,7 @@
     "@capacitor/splash-screen": "8.0.2",
     "@capacitor/status-bar": "8.0.3",
     "@capawesome/capacitor-badge": "8.0.2",
+    "@capawesome/capacitor-file-picker": "8.1.0",
     "capacitor-secure-storage-plugin": "0.13.0",
     "send-intent": "7.0.0"
   },

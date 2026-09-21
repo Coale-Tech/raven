@@ -1042,6 +1042,11 @@
   resolved "https://registry.yarnpkg.com/@capawesome/capacitor-badge/-/capacitor-badge-8.0.2.tgz#f6f33fdb307e527af7af658f3bcf6dbebe2e45d7"
   integrity sha512-4ZnRyFvViaokupdrOi3OkoBurH+23hnxni+PYq5C1ObNLYbhty/WK8BzMtndCv0S47XjGBLjQ9DJsYj3JDVxGQ==
 
+"@capawesome/capacitor-file-picker@8.1.0":
+  version "8.1.0"
+  resolved "https://registry.yarnpkg.com/@capawesome/capacitor-file-picker/-/capacitor-file-picker-8.1.0.tgz#8b8216e872c9784c4c86b645e11500718489afa1"
+  integrity sha512-vBWB9VWwW/Yf1EewXZ2Ng2COZwSbbJplJ5vcNVEIgCWqr9OfQI0tZdRx3i2F661mrDWftAGLG4zmYZ75MLUmJg==
+
 "@clack/core@0.3.5", "@clack/core@^0.3.5":
   version "0.3.5"
   resolved "https://registry.yarnpkg.com/@clack/core/-/core-0.3.5.tgz#3e1454c83a329353cc3a6ff8491e4284d49565bb"
