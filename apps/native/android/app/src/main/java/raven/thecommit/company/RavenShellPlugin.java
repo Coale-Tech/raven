@@ -1,6 +1,7 @@
 package raven.thecommit.company;
 
 import android.content.ClipData;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -105,6 +106,7 @@ public class RavenShellPlugin extends Plugin {
         ClipData clip = intent.getClipData();
         Uri uri = clip != null && index < clip.getItemCount() ? clip.getItemAt(index).getUri() : null;
         if (uri == null && index == 0) uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        if (!isForeignContent(uri)) uri = null;
         String title = index == 0 ? intent.getStringExtra(Intent.EXTRA_SUBJECT) : null;
         if (title == null && uri != null) title = displayName(uri);
         String text = index == 0 ? intent.getStringExtra(Intent.EXTRA_TEXT) : null;
@@ -118,6 +120,13 @@ public class RavenShellPlugin extends Plugin {
         }
         item.put("type", intent.getType());
         return item;
+    }
+
+    /** The sender picks the uri: a file uri or our own provider would read this app's private files. */
+    private boolean isForeignContent(Uri uri) {
+        if (uri == null || !ContentResolver.SCHEME_CONTENT.equals(uri.getScheme())) return false;
+        String host = uri.getHost();
+        return host != null && !host.startsWith(getContext().getPackageName());
     }
 
     private Uri copyToCache(Uri uri, String name) {
