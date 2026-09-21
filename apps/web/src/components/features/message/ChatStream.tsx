@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useOnlineStatus } from "@stores/connectionState"
+import { OfflineState } from "@components/common/OfflineState"
 import { useSearchParams } from "react-router-dom"
 import { useAtom, useAtomValue } from "jotai"
 import { ArrowDown, LoaderCircle } from "lucide-react"
@@ -256,6 +257,9 @@ export default function ChatStream({ channelID, pinnedMessagesString, initialMes
                             <div className="flex min-w-0 w-full flex-col md:px-3 pb-6">
                                 {isLoading ? (
                                     <MessageListSkeleton />
+                                ) : error && import.meta.env.VITE_NATIVE && !online ? (
+                                    // Native offline: a retry would fail too; the stream refetches itself on reconnect.
+                                    <OfflineState />
                                 ) : error ? (
                                     <StreamError error={error} onRetry={jumpToLatest} />
                                 ) : blocks.length === 0 ? (

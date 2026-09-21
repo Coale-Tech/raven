@@ -1,33 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { isOnline, setSiteReachable, subscribeOnline } from "./connectionState"
 
-describe("connectionState", () => {
-    let online = true
-    const handlers = new Map<string, () => void>()
-    const realNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator")
-    beforeEach(() => {
-        vi.resetModules()
-        ;(globalThis as any).window = { addEventListener: (name: string, fn: () => void) => handlers.set(name, fn) }
-        // Node's navigator is a getter-only global: replace the property, not the value.
-        Object.defineProperty(globalThis, "navigator", { value: { get onLine() { return online } }, configurable: true })
-    })
-    afterEach(() => {
-        delete (globalThis as any).window
-        if (realNavigator) Object.defineProperty(globalThis, "navigator", realNavigator)
-        handlers.clear()
-        online = true
-    })
-
-    it("reflects navigator.onLine and notifies subscribers on the browser events", async () => {
-        const { isOnline, subscribeOnline } = await import("./connectionState")
+describe("setSiteReachable", () => {
+    beforeEach(() => { vi.useFakeTimers(); setSiteReachable(true) })
+    afterEach(() => vi.useRealTimers())
+    it("goes offline 5 s after the site stops answering, and back at once", () => {
+        const seen: boolean[] = []
+        const unsubscribe = subscribeOnline(() => seen.push(isOnline()))
+        setSiteReachable(false)
         expect(isOnline()).toBe(true)
-        const seen = vi.fn()
-        const unsubscribe = subscribeOnline(seen)
-        online = false
-        handlers.get("offline")!()
+        vi.advanceTimersByTime(5000)
         expect(isOnline()).toBe(false)
-        expect(seen).toHaveBeenCalledTimes(1)
+        setSiteReachable(true)
+        expect(isOnline()).toBe(true)
+        expect(seen).toEqual([false, true])
         unsubscribe()
-        handlers.get("online")!()
-        expect(seen).toHaveBeenCalledTimes(1)
+    })
+    it("reports the end of an outage once", () => {
+        setSiteReachable(false)
+        vi.advanceTimersByTime(5000)
+        expect(setSiteReachable(true)).toBe(true)
+        expect(setSiteReachable(true)).toBe(false)
+    })
+    it("drops a pending outage when the site answers in time", () => {
+        setSiteReachable(false)
+        vi.advanceTimersByTime(2000)
+        setSiteReachable(true)
+        vi.advanceTimersByTime(5000)
+        expect(isOnline()).toBe(true)
     })
 })

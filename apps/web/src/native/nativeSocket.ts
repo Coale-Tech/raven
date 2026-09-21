@@ -1,3 +1,5 @@
+import { socketDown, socketUp } from "./reachability"
+
 type Handler = (...args: unknown[]) => void
 type Handle = { remove: () => Promise<void> }
 
@@ -47,17 +49,20 @@ export class NativeSocket {
     async start() {
         const { plugin } = await this.plugin
         await plugin.addListener("connect", () => {
+            socketUp()
             this.connected = true
             const queued = this.queue
             this.queue = []
             queued.forEach(({ event, args }) => plugin.emit({ event, args }).catch(() => { }))
             dispatch(this.handlers, "connect", [])
         })
-        await plugin.addListener("disconnect", () => { this.connected = false; dispatch(this.handlers, "disconnect", []) })
+        await plugin.addListener("disconnect", () => { socketDown(); this.connected = false; dispatch(this.handlers, "disconnect", []) })
         await plugin.addListener("connect_error", ({ message }) => dispatch(this.handlers, "connect_error", [message]))
         await plugin.addListener("reconnect", () => dispatch(this.managerHandlers, "reconnect", []))
         await plugin.addListener("event", ({ event, args }) => { if (event) dispatch(this.handlers, event, args ?? []) })
         await plugin.connect({ ...this.target, token: this.token() })
+        // A site that never answers fires no disconnect; a first connect this slow gets the same check.
+        setTimeout(() => { if (!this.connected) socketDown() }, 10_000)
         // A background drops the socket; on return, dial again at once rather than after the client's backoff.
         const { App } = await import("@capacitor/app")
         await App.addListener("appStateChange", ({ isActive }) => { if (isActive && !this.connected) this.connect() })
