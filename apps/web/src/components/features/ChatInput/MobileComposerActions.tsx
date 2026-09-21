@@ -2,7 +2,8 @@ import { useRef, useState } from "react"
 import { Plus, Camera, Images, FileBox, type LucideIcon, FilesIcon, ChartBar, Video } from "lucide-react"
 import { Button } from "@components/ui/button"
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } from "@components/ui/drawer"
-import { useAttachFile } from "./useFileInput"
+import { useSetAtom } from "jotai"
+import { preparingFilesAtom, useAttachFile } from "./useFileInput"
 import { CreatePollDialog } from "./CreatePollDialog"
 import AttachFrappeDocumentDialog from "./AttachFrappeDocumentDialog"
 import { isAndroid } from "@utils/platform"
@@ -41,6 +42,7 @@ export const MobileComposerActions = ({
     const [pollOpen, setPollOpen] = useState(false)
     const [docOpen, setDocOpen] = useState(false)
     const onAddFile = useAttachFile(channelID)
+    const setPreparing = useSetAtom(preparingFilesAtom(channelID))
     const cameraInputRef = useRef<HTMLInputElement>(null)
     const videoCaptureRef = useRef<HTMLInputElement>(null)
     const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -50,10 +52,13 @@ export const MobileComposerActions = ({
     // The ternary keeps the native chunk out of browser builds entirely.
     const pickNative = import.meta.env.VITE_NATIVE
         ? (kind: "files" | "photos") => {
+            // The row shows from here: the picker hides it while open, and the wait starts when it closes.
+            setPreparing((n) => n + 1)
             import("../../../native/pick")
                 .then((m) => m.pickNativeFiles(kind))
                 .then((files) => { if (files.length) onAddFile(files) })
                 .catch(() => { })
+                .finally(() => setPreparing((n) => n - 1))
         }
         : () => { }
 

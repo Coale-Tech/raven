@@ -1,8 +1,4 @@
 import { siteFetch, siteOrigin } from '@lib/site'
-import _ from '@lib/translate'
-
-/** Native hands files to the share sheet, so the action is named for what it does. */
-export const downloadLabel = () => (import.meta.env.VITE_NATIVE ? _("Share") : _("Download"))
 /**
  * Function to return extension of a file
  * @param filename name of the file with extension

@@ -102,7 +102,7 @@ db.version(3).stores({
     visit_outbox: "channel_id"
 })
 
-// v4: the newest messages of every visited channel, for offline cold starts (layer 4).
+// v4: the newest messages of every visited channel, for offline cold starts.
 db.version(4).stores({
     message_windows: "channel_id"
 })

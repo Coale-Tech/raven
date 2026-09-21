@@ -6,7 +6,7 @@ import type { Message } from "@raven/types/common/Message"
 import type { MessageDialog } from "@utils/channelAtoms"
 import { channelMessagesStore } from "@stores/messages/store"
 import { hasFile } from "./fileMessage"
-import { downloadBlob, downloadFile, downloadLabel, getAbsoluteFileURL } from "@lib/file"
+import { downloadBlob, downloadFile, getAbsoluteFileURL } from "@lib/file"
 import { siteFetch } from "@lib/site"
 import { getFileName } from "@raven/lib/utils/operations"
 
@@ -88,7 +88,8 @@ export const buildFileActions = (
 
         actions.push({
             id: "download",
-            label: downloadLabel(),
+            // Native hands files to the share sheet, so the action is named for what it does.
+            label: import.meta.env.VITE_NATIVE ? _("Share") : _("Download"),
             icon: DownloadIcon,
             // A plain anchor download on EVERY platform, mobile included. Routing mobile
             // through the Web Share sheet was the original design, on the belief that iOS

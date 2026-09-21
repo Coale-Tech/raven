@@ -16,7 +16,7 @@ import { SwipeDownToClose } from "./SwipeDownToClose"
 import { AudioPlayer } from "./AudioPlayer"
 import { useUser } from "@hooks/useUser"
 import { useIsMobile } from "@hooks/use-mobile"
-import { downloadFile, downloadLabel, getFileExtension, shareFile } from "@lib/file"
+import { downloadFile, getFileExtension, shareFile } from "@lib/file"
 import { formatBytes } from "@raven/lib/utils/operations"
 import { cn } from "@lib/utils"
 import _ from "@lib/translate"
@@ -243,7 +243,7 @@ const AttachmentPreviewContent = ({
                 Desktop keeps the in-flow row (the PDF embed needs its reserved
                 space). */}
             <div ref={setHeaderEl} className={cn(
-                "shrink-0 p-3 transition-opacity duration-150 max-md:absolute max-md:inset-x-0 max-md:top-0 max-md:z-20 standalone:max-md:pt-[calc(0.75rem+env(safe-area-inset-top))]",
+                "shrink-0 p-3 transition-opacity duration-150 max-md:absolute max-md:inset-x-0 max-md:top-0 max-md:z-20 standalone:max-md:pt-[calc(0.75rem+var(--inset-top))]",
                 chromeHidden && "pointer-events-none opacity-0",
             )}>
                 <MediaPreviewHeader
@@ -415,7 +415,7 @@ const AttachmentPreviewContent = ({
                         // Extra bottom padding on mobile = the home-indicator
                         // safe area, so the tiles sit clear of the OS home /
                         // app-switch swipe zone (zero on devices without one).
-                        "shrink-0 p-3 transition-opacity duration-150 max-md:absolute max-md:inset-x-0 max-md:bottom-0 max-md:z-20 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))]",
+                        "shrink-0 p-3 transition-opacity duration-150 max-md:absolute max-md:inset-x-0 max-md:bottom-0 max-md:z-20 max-md:pb-[calc(0.75rem+var(--inset-bottom))]",
                         chromeHidden && "pointer-events-none opacity-0",
                     )}
                     onClick={(event) => { if (event.target === event.currentTarget) close() }}
@@ -569,7 +569,7 @@ const DownloadCard = ({ attachment, isMobile }: { attachment: Attachment; isMobi
                 <p className="text-sm text-ink-gray-5">{_("No preview available")}</p>
             </div>
             <Button variant="solid" theme="gray" onClick={action}>
-                {openInTab ? _("Open") : downloadLabel()}
+                {openInTab ? _("Open") : import.meta.env.VITE_NATIVE ? _("Share") : _("Download")}
             </Button>
         </div>
     )

@@ -6,7 +6,6 @@ import { UserAvatar } from "../UserAvatar"
 import { useMessageTimes } from "./MessageRow"
 import { formatRelativeDate } from "@lib/date"
 import _ from "@lib/translate"
-import { downloadLabel } from "@lib/file"
 import type { UserData } from "@db"
 
 /**
@@ -95,8 +94,8 @@ export const MediaPreviewHeader = ({
                         variant="ghost"
                         size="md"
                         isIconButton
-                        title={downloadLabel()}
-                        aria-label={downloadLabel()}
+                        title={import.meta.env.VITE_NATIVE ? _("Share") : _("Download")}
+                        aria-label={import.meta.env.VITE_NATIVE ? _("Share") : _("Download")}
                         onClick={onDownload}
                     >
                         {import.meta.env.VITE_NATIVE ? <Share /> : <ArrowDownToLineIcon />}

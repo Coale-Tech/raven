@@ -69,6 +69,9 @@ export interface UploadedFile {
 
 
 
+/** Native picks still being handed over per channel: the picker has closed, the files are not here yet. */
+export const preparingFilesAtom = atomFamily((_channelID: string) => atom(0))
+
 /** Atom to track files that are being uploaded per channel */
 export const uploadingFilesAtom = atomFamily((_channelID: string) => atom<QueuedFileType[]>([]))
 

@@ -11,7 +11,7 @@ import SendButton from "./SendButton"
 import { MentionButton } from "./MentionButton"
 import { EmojiPickerButton } from "./EmojiPickerButton"
 import { CreatePollDialog } from "./CreatePollDialog"
-import { uploadedFilesAtom, uploadingFilesAtom, pendingSendAtom, useAttachFile } from "./useFileInput"
+import { uploadedFilesAtom, uploadingFilesAtom, pendingSendAtom, preparingFilesAtom, useAttachFile } from "./useFileInput"
 import { registerComposerFocus } from "./composerFocus"
 import { consumeSharedFiles } from "./sharedFiles"
 import { useRavenEditor, EDITOR_MIN_H } from "@components/features/editor/useRavenEditor"
@@ -129,9 +129,11 @@ const ChatInput = forwardRef<HTMLFormElement, ChatInputProps>(({ channelID, isDi
     // errored upload settles but must not be silently sent without. We subscribe
     // to just these booleans (not the array) so per-tick upload-progress updates
     // don't re-render this component — and with it the editor — on every percent.
-    const hasUploadsInFlight = useAtomValue(
+    const isUploading = useAtomValue(
         useMemo(() => selectAtom(uploadingFilesAtom(channelID), (f) => f.some((file) => file.status === "uploading")), [channelID]),
     )
+    // A pick still being handed over holds a send too, or the message would leave without it.
+    const hasUploadsInFlight = useAtomValue(preparingFilesAtom(channelID)) > 0 || isUploading
     const hasFailedUploads = useAtomValue(
         useMemo(() => selectAtom(uploadingFilesAtom(channelID), (f) => f.some((file) => file.status === "error")), [channelID]),
     )

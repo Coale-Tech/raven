@@ -1,5 +1,5 @@
 import { useAtomValue, useSetAtom } from 'jotai'
-import { uploadingFilesAtom, uploadedFilesAtom, useAttachFile, useRemoveFile, FileItemType } from './useFileInput'
+import { uploadingFilesAtom, uploadedFilesAtom, preparingFilesAtom, useAttachFile, useRemoveFile, FileItemType } from './useFileInput'
 import { Button } from '@components/ui/button'
 import { FileImage } from '@components/common/FileImage'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@components/ui/tooltip'
@@ -8,6 +8,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import FileTypeIcon from '@components/common/FileIcons/FileTypeIcon'
 import { formatBytes, getFileExtension } from '@raven/lib/utils/operations'
 import { ProgressCircle } from '@components/ui/circular-progress'
+import { Spinner } from '@components/ui/spinner'
 import { attachmentPreviewAtom, stagedFilesToAttachments, getAttachmentKind } from '@utils/attachmentPreview'
 import { useUserCookieData } from '@hooks/useUserCookieData'
 import { cn } from '@lib/utils'
@@ -22,6 +23,7 @@ export const InputFileList = ({ channelID }: InputFilesProps) => {
 
     const uploadingFiles = useAtomValue(uploadingFilesAtom(channelID))
     const uploadedFiles = useAtomValue(uploadedFilesAtom(channelID))
+    const preparing = useAtomValue(preparingFilesAtom(channelID)) > 0
 
     const files = useMemo(() => {
 
@@ -52,13 +54,20 @@ export const InputFileList = ({ channelID }: InputFilesProps) => {
     }, [files, currentUser, setPreview])
 
     // Nothing staged → render nothing (no empty padded strip inside the composer box).
-    if (files.length === 0) return null
+    if (files.length === 0 && !preparing) return null
 
     return (
         <div className='flex gap-2 flex-wrap px-2 md:pt-2 pt-0 pb-2 md:pb-0'>
             {files.map((file) => (
                 <FileItem key={file.id} file={file} onRemove={onRemove} onPreview={onPreview} />
             ))}
+            {/* A native pick has no name or count until iOS hands it over, which can take a moment. */}
+            {preparing && (
+                <div className="flex items-center gap-2 rounded-md border border-outline-gray-2 p-2 md:w-64 w-full">
+                    <div className="flex size-9 shrink-0 items-center justify-center"><Spinner size="md" /></div>
+                    <p className="md:text-xs-medium text-sm-medium text-ink-gray-6">{_("Preparing attachments…")}</p>
+                </div>
+            )}
         </div>
     )
 }
