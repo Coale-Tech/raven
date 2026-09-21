@@ -50,12 +50,19 @@ export const bootNative = async () => {
     }
     // Storage keys and URLs are scoped from here on; boot needs the token.
     setActiveSite(session.site.url, session.getToken)
+    void import("./media").then((m) => m.setMediaSession(session.getToken()))
     if (!(await loadBoot())) return toPicker()
     // Loaded only now: App's module graph reads boot and scoped storage keys at import.
     const { default: App } = await import("../App")
     const socket = new NativeSocket({ url: socketUrl(session.site.url), namespace: session.site.sitename, origin: session.site.url }, session.getToken)
-    setTokenRefreshedHandler((token) => socket.setToken(token))
+    setTokenRefreshedHandler((token) => { socket.setToken(token); void import("./media").then((m) => m.setMediaSession(token)) })
     socket.start().catch(() => { })
     render(<App native={{ url: session.site.url, siteName: session.site.sitename, getToken: session.getToken, onRequestError, socket: socket as unknown as FrappeConfig["socket"] }} />)
     initNativePush()
+    // Media eviction follows the message cache: after each flush, throttled, and once at start.
+    // Imported here, not at the top: the cache module opens the site-scoped database on load.
+    void Promise.all([import("./media"), import("@stores/messages/messageCache")]).then(([m, cache]) => {
+        cache.setCacheFlushListener(() => { void m.trimMediaCache() })
+        void m.trimMediaCache()
+    })
 }

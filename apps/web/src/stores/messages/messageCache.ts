@@ -29,6 +29,9 @@ export const pageFromRows = (rows: Message[]): MessagesPage => ({
 const dirty = new Map<string, ChannelMessagesState>()
 const written = new Map<string, Message[]>()
 let timer: ReturnType<typeof setTimeout> | undefined
+let onFlushed: (() => void) | undefined
+/** Native hooks the media trim here; a browser tab never sets it. */
+export const setCacheFlushListener = (fn: (() => void) | undefined) => { onFlushed = fn }
 
 // Store messages are immutable, so identical identities mean identical bytes on disk.
 const sameRows = (a: Message[] | undefined, b: Message[]) => a?.length === b.length && a.every((m, i) => m === b[i])
@@ -50,6 +53,7 @@ const flush = async () => {
         // Quota or a closed database: forget the attempt so the next change tries again.
         for (const { channel_id } of windows) written.delete(channel_id)
     }
+    onFlushed?.()
 }
 
 /** Remembers the latest state; one write per second covers every dirty channel. */

@@ -6,6 +6,8 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -16,6 +18,7 @@ import androidx.webkit.WebViewFeature;
 import java.util.Collections;
 import java.util.Locale;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -23,6 +26,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(RavenShellPlugin.class);
         registerPlugin(RavenSocketPlugin.class);
         registerPlugin(RavenDownloadPlugin.class);
+        registerPlugin(RavenMediaPlugin.class);
         // A share or notification tap only ever arrives as a fresh launch or onNewIntent.
         // A recreated activity (process death, Recents) gets the task's root intent
         // again; drop it, or the share or tap the user already acted on replays.
@@ -31,7 +35,19 @@ public class MainActivity extends BridgeActivity {
         boolean replayable = RavenShellPlugin.isShare(launch) || (launch != null && launch.hasExtra("google.message_id"));
         if (replayable && (savedInstanceState != null || fromHistory)) setIntent(new Intent());
         super.onCreate(savedInstanceState);
+        serveMediaProxy();
         publishSystemBarInsets();
+    }
+
+    // Media proxy requests are answered here; everything else keeps Capacitor's client.
+    private void serveMediaProxy() {
+        getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                WebResourceResponse media = RavenMediaHandler.handle(getApplicationContext(), request);
+                return media != null ? media : super.shouldInterceptRequest(view, request);
+            }
+        });
     }
 
     private ScriptHandler insetScript;

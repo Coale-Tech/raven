@@ -1,9 +1,9 @@
 import { isPrivateFile, siteToken, siteUrl } from "@lib/site"
+import { mediaFolder } from "./mediaUrl"
 import { nativePlugin } from "./platform"
 
 // Share-out needs the whole file on disk. RavenDownload streams it natively with the bearer (no
 // CORS: hosted sites serve public files straight from nginx), reports progress, and can be cancelled.
-// media/ is the one file cache; offline viewing and eviction join it with the media proxy.
 const DIR = "media"
 
 type Progress = { id: string; bytes: number; total: number }
@@ -15,12 +15,10 @@ type RavenDownloadPlugin = {
 
 const downloader = nativePlugin<RavenDownloadPlugin>("RavenDownload")
 
-/** Stable path per site file: a hash folder, so the file keeps its own name for the share sheet. */
+/** Cache path of a site file, shared with the media proxy so one download serves both. */
 export const downloadName = (path: string) => {
-    let hash = 5381
-    for (let i = 0; i < path.length; i++) hash = ((hash * 33) ^ path.charCodeAt(i)) >>> 0
-    const base = decodeURIComponent(path.split("?")[0].split("/").pop() ?? "").replace(/[^\w.-]/g, "_").replace(/^\.+/, "")
-    return `${DIR}/${hash.toString(36)}/${base || "file"}`
+    const { folder, file } = mediaFolder(path)
+    return `${DIR}/${folder}/${file}`
 }
 
 const inflight = new Map<string, Promise<string>>()

@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import WebKit
 
 // Root view controller of Main.storyboard.
 class RavenBridgeViewController: CAPBridgeViewController {
@@ -8,6 +9,14 @@ class RavenBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(RavenShellPlugin())
         bridge?.registerPluginInstance(RavenSocketPlugin())
         bridge?.registerPluginInstance(RavenDownloadPlugin())
+        bridge?.registerPluginInstance(RavenMediaPlugin())
+    }
+
+    // The media scheme must be registered before the WKWebView exists.
+    override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
+        let configuration = super.webViewConfiguration(for: instanceConfiguration)
+        configuration.setURLSchemeHandler(RavenMediaHandler.shared, forURLScheme: "raven-media")
+        return configuration
     }
 
     override func viewDidLoad() {

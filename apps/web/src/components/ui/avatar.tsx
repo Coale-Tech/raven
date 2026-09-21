@@ -20,7 +20,7 @@ function Avatar({
   )
 }
 
-// Private site files need the token in native; useFileSrc resolves them to object URLs.
+// Private site files need the token in native; useFileSrc routes them through the media proxy.
 function AvatarImage({
   className,
   src,

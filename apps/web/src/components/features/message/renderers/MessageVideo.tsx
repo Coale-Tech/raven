@@ -1,7 +1,6 @@
 import type { Message } from "@raven/types/common/Message"
 import { fitImageBox } from "./ReservedImage"
 import { useFileSrc } from "@hooks/useFileSrc"
-import { nativePlatform } from "../../../../native/platform"
 
 type VideoLikeMessage = Message & {
     file?: string
@@ -30,13 +29,11 @@ export const MessageVideo = ({ messages }: { messages: Message[] }) => (
 const VideoCard = ({ message }: { message: VideoLikeMessage }) => {
     const hasDims = Boolean(message.thumbnail_width && message.thumbnail_height)
     // Mobile WebViews paint no frame for preload="metadata"; the fragment makes them seek and paint one.
-    // WebKit refuses a blob source with a fragment, so private files on iOS keep the bare object URL.
     const src = useFileSrc(message.file)
-    const seekable = src && !(nativePlatform() === "ios" && src.startsWith("blob:"))
     return (
         <div data-message-id={message.name} data-media-root="" className="max-w-md lg:max-w-lg">
             <video
-                src={seekable ? `${src}#t=0.001` : src}
+                src={src && `${src}#t=0.001`}
                 playsInline
                 controls
                 preload="metadata"
