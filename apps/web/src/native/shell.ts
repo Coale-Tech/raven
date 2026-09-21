@@ -9,6 +9,8 @@ export type RavenShellPlugin = {
     clearShareIntent(): Promise<void>
     /** Android: share a cached file through a chooser with no result tracking. iOS uses @capacitor/share. */
     share(options: { uri: string; title?: string; type?: string }): Promise<void>
+    /** Re-read the mirrored app theme (native/theme.ts) and theme the canvas behind the page with it. */
+    applyTheme(): Promise<void>
     /** Post a notification for another site; its tap reports through FirebaseMessaging like a push. */
     showNotification(options: { title?: string; body?: string; site?: string; image?: string; tag?: string; data: Record<string, string> }): Promise<void>
     /** Android: a warm share arrived. iOS dispatches the `sendIntentReceived` DOM event instead. */

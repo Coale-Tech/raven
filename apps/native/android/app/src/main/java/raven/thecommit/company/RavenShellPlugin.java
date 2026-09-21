@@ -36,6 +36,15 @@ public class RavenShellPlugin extends Plugin {
         }).start();
     }
 
+    // The canvas behind the page follows the app's own theme; launch and resume read the same mirror.
+    @PluginMethod
+    public void applyTheme(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            RavenApplication.applyStoredNightMode(getContext());
+            call.resolve();
+        });
+    }
+
     // ---- share out ----------------------------------------------------------------
     // Own chooser so Raven can be excluded from it (the Share plugin cannot), and no
     // result tracking, so nothing is left "in progress" if the chooser never reports back.

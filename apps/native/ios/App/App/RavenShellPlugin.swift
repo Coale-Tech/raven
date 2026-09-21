@@ -12,6 +12,7 @@ public class RavenShellPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getShareIntent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearShareIntent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showNotification", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "applyTheme", returnType: CAPPluginReturnPromise),
     ]
 
     override public func load() {
@@ -24,6 +25,14 @@ public class RavenShellPlugin: CAPPlugin, CAPBridgedPlugin {
 
     // A foreground push is handed to the page (presentationOptions []); the page
     // re-posts the ones from another saved site through here.
+    // The canvas behind the page follows the app's own theme; launch and foreground read the same mirror.
+    @objc func applyTheme(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.bridge?.webView?.window?.applyStoredTheme()
+            call.resolve()
+        }
+    }
+
     @objc func showNotification(_ call: CAPPluginCall) {
         let content = UNMutableNotificationContent()
         content.title = call.getString("title") ?? ""

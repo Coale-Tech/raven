@@ -7,7 +7,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         // The window and its RavenBridgeViewController root come from Main.storyboard.
-        applyStoredTheme()
+        window?.applyStoredTheme()
         // A cold-start share arrives here, not in openURLContexts; the proxy replays
         // the URL only into its own handler.
         for context in connectionOptions.urlContexts where context.url.scheme == "raven" { receiveShare(context.url) }
@@ -15,19 +15,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
 
-    // In-app theme choice, mirrored by the web app into Capacitor Preferences.
-    // Drives the WebView's prefers-color-scheme and the canvas colors alike.
-    private func applyStoredTheme() {
-        switch UserDefaults.standard.string(forKey: "CapacitorStorage.appTheme") {
-        case "dark": window?.overrideUserInterfaceStyle = .dark
-        case "light": window?.overrideUserInterfaceStyle = .light
-        default: window?.overrideUserInterfaceStyle = .unspecified
-        }
-    }
-
     // Re-read on every foreground so a theme changed in-app applies without a relaunch.
     func sceneWillEnterForeground(_ scene: UIScene) {
-        applyStoredTheme()
+        window?.applyStoredTheme()
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
@@ -61,5 +51,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)
+    }
+}
+
+extension UIWindow {
+    // In-app theme choice, mirrored by the web app into Capacitor Preferences.
+    // Drives the WebView's prefers-color-scheme and the canvas colors alike.
+    func applyStoredTheme() {
+        switch UserDefaults.standard.string(forKey: "CapacitorStorage.appTheme") {
+        case "dark": overrideUserInterfaceStyle = .dark
+        case "light": overrideUserInterfaceStyle = .light
+        default: overrideUserInterfaceStyle = .unspecified
+        }
     }
 }
