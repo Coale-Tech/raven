@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
+import android.webkit.MimeTypeMap;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
@@ -17,6 +18,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 
 /**
  * Shell plugin for the bundled Raven page (contract: apps/web/src/native/shell.ts):
@@ -107,19 +109,34 @@ public class RavenShellPlugin extends Plugin {
         Uri uri = clip != null && index < clip.getItemCount() ? clip.getItemAt(index).getUri() : null;
         if (uri == null && index == 0) uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (!isForeignContent(uri)) uri = null;
+        String type = uri != null ? getContext().getContentResolver().getType(uri) : null;
+        if (type == null) type = intent.getType();
         String title = index == 0 ? intent.getStringExtra(Intent.EXTRA_SUBJECT) : null;
-        if (title == null && uri != null) title = displayName(uri);
+        // A file's title is its name, not the subject: a screenshot's subject has no extension.
+        if (uri != null) title = fileName(uri, type);
         String text = index == 0 ? intent.getStringExtra(Intent.EXTRA_TEXT) : null;
         if (title != null) item.put("title", title);
         if (text != null) item.put("description", text);
         if (uri != null) {
             // The content URI grant ends with this activity, but the stash may be read
             // by a later process (no site saved yet): copy into our own cache.
-            Uri copy = copyToCache(uri, title != null ? title : "shared");
+            Uri copy = copyToCache(uri, title);
             item.put("url", (copy != null ? copy : uri).toString());
         }
-        item.put("type", intent.getType());
+        item.put("type", type);
         return item;
+    }
+
+    /** The provider's name for the file, with an extension from its MIME type when it has none. */
+    private String fileName(Uri uri, String type) {
+        String name = displayName(uri);
+        if (name == null || name.isEmpty()) name = "shared";
+        // A known extension only: a name like "Screenshot 7.30 PM" has a dot but no extension.
+        MimeTypeMap map = MimeTypeMap.getSingleton();
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0 && map.hasExtension(name.substring(dot + 1).toLowerCase(Locale.ROOT))) return name;
+        String ext = type != null ? map.getExtensionFromMimeType(type) : null;
+        return ext == null ? name : name + "." + ext;
     }
 
     /** The sender picks the uri: a file uri or our own provider would read this app's private files. */

@@ -30,12 +30,25 @@ final class ShareViewController: UIViewController {
             return ["title": text, "description": text, "type": "text/plain", "url": ""]
         }
         for type in [UTType.movie, UTType.image, UTType.data] where provider.hasItemConformingToTypeIdentifier(type.identifier) {
-            let loaded = try? await provider.loadItem(forTypeIdentifier: type.identifier)
+            // The most specific type offered (public.png, not public.image): only it has a MIME type and extension.
+            let concrete = provider.registeredTypeIdentifiers.compactMap { UTType($0) }.first { $0.conforms(to: type) } ?? type
+            let loaded = try? await provider.loadItem(forTypeIdentifier: concrete.identifier)
             if let url = loaded as? URL { return copy(url) }
             if let image = loaded as? UIImage, let data = image.pngData() { return write(data, name: "image_\(index).png", type: "image/png") }
-            if let data = loaded as? Data { return write(data, name: "shared_\(index)", type: type.preferredMIMEType ?? "application/octet-stream") }
+            if let data = loaded as? Data {
+                return write(data, name: name(provider.suggestedName ?? "shared_\(index)", as: concrete), type: concrete.preferredMIMEType ?? "application/octet-stream")
+            }
         }
         return nil
+    }
+
+    // In-memory data, such as an unsaved screenshot, can arrive without an extension: it gets its type's.
+    private func name(_ base: String, as type: UTType) -> String {
+        // A known extension only: a name like "Screenshot at 7.30.12 PM" has a dot but no extension.
+        let existing = (base as NSString).pathExtension
+        if !existing.isEmpty, UTType(filenameExtension: existing)?.isDynamic == false { return base }
+        guard let ext = type.preferredFilenameExtension else { return base }
+        return "\(base).\(ext)"
     }
 
     private func copy(_ url: URL) -> [String: String]? {

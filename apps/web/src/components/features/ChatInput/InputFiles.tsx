@@ -72,9 +72,29 @@ export const InputFileList = ({ channelID }: InputFilesProps) => {
     )
 }
 
-const FileItem = ({ file, onRemove, onPreview }: { file: FileItemType, onRemove: (file: FileItemType) => void, onPreview: (file: FileItemType) => void }) => {
+/** Thumbnail or type icon, then name and size: one file's summary inside a row. */
+export const FileSummary = ({ name, size, imageSrc }: { name: string, size: number, imageSrc?: string }) => {
+    const isMobile = useIsMobile()
+    return <>
+        <div className="shrink-0">
+            {imageSrc ? (
+                <FileImage src={imageSrc} alt={name} decoding="async" className="size-7 rounded-3 object-contain bg-surface-gray-1 object-center" />
+            ) : (
+                <FileTypeIcon fileType={getFileExtension(name)} size={isMobile ? "xl" : "lg"} />
+            )}
+        </div>
+        <div className="flex-1 min-w-0">
+            <h4 className="md:text-xs-medium mb-0.5 text-sm-medium leading-snug text-ink-gray-8 truncate">
+                {name}
+            </h4>
+            <p className="md:text-xs text-sm text-ink-gray-5">
+                {formatBytes(size)}
+            </p>
+        </div>
+    </>
+}
 
-    const extension = getFileExtension(file.fileName)
+const FileItem = ({ file, onRemove, onPreview }: { file: FileItemType, onRemove: (file: FileItemType) => void, onPreview: (file: FileItemType) => void }) => {
 
     const isMobile = useIsMobile()
     // Uploaded files can be opened in the viewer; uploading/errored can't.
@@ -94,21 +114,7 @@ const FileItem = ({ file, onRemove, onPreview }: { file: FileItemType, onRemove:
         title={canPreview ? _("Click to preview") : undefined}
     >
         <div className="flex items-center gap-2 p-2">
-            <div className="shrink-0">
-                {showImageThumb ? (
-                    <FileImage src={file.fileURL} alt={file.fileName} className="size-7 rounded-3 object-contain bg-surface-gray-1 object-center" />
-                ) : (
-                    <FileTypeIcon fileType={extension} size={isMobile ? "xl" : "lg"} />
-                )}
-            </div>
-            <div className="flex-1 min-w-0">
-                <h4 className="md:text-xs-medium mb-0.5 text-sm-medium leading-snug text-ink-gray-8 truncate">
-                    {file.fileName}
-                </h4>
-                <p className="md:text-xs text-sm text-ink-gray-5">
-                    {formatBytes(file.size)}
-                </p>
-            </div>
+            <FileSummary name={file.fileName} size={file.size} imageSrc={showImageThumb ? file.fileURL : undefined} />
             {/* When the file is being uploaded, show a circular progress bar and when it's uploaded show the delete button */}
             <div className="flex items-center size-9 justify-center">
                 {file.status === 'uploading' &&

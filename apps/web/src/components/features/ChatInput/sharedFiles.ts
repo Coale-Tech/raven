@@ -6,6 +6,9 @@ export const stashSharedFiles = (files: File[]) => {
     sharedFiles = files
 }
 
+/** The stash without emptying it: ShareTarget previews what the composer will take. */
+export const peekSharedFiles = (): File[] => sharedFiles
+
 export const consumeSharedFiles = (): File[] => {
     const files = sharedFiles
     sharedFiles = []
