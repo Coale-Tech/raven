@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ChevronLeft, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { Button } from "@components/ui/button"
 import { Input } from "@components/ui/input"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@components/ui/alert-dialog"
@@ -53,7 +53,7 @@ const versionNotice = async (site: Site): Promise<VersionNotice | null> => {
 // its right instead: sliding would clip the name.
 const REVEAL_PX = 48
 
-/** One saved site. The trash hides behind the row until a swipe left or the chevron slides the row aside. */
+/** One saved site. The trash hides behind the row until a swipe left slides the row aside. */
 const SiteRow = ({ site, revealed, disabled, onReveal, onOpen, onRemove }: {
     site: Site; revealed: boolean; disabled: boolean
     onReveal: (revealed: boolean) => void; onOpen: () => void; onRemove: () => void
@@ -97,23 +97,19 @@ const SiteRow = ({ site, revealed, disabled, onReveal, onOpen, onRemove }: {
                 <Trash2 className="size-5" />
             </button>
             <div ref={card} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
-                // --reveal runs from 0 closed to 1 open. The slide and the chevron's turn both read it, so they move as one.
+                // --reveal runs from 0 closed to 1 open; the slide reads it.
                 style={{ "--reveal": rest } as React.CSSProperties}
-                // A touch on either button lights the whole row, not just the button under the finger.
-                className={cn("group relative flex items-center rounded-lg bg-surface-gray-2 duration-200 ease-out has-[button:active]:bg-surface-gray-3 data-[dragging]:transition-none",
+                // A touch lights the whole row.
+                className={cn("relative flex items-center rounded-lg bg-surface-gray-2 duration-200 ease-out has-[button:active]:bg-surface-gray-3 data-[dragging]:transition-none",
                     logoUrl ? "-translate-x-[calc(var(--reveal)*var(--slot))] transition-[translate]" : "me-[calc(var(--reveal)*var(--slot))] transition-[margin]")}>
                 {/* A tap on a row that is slid aside puts it back; only a resting row opens its site. */}
                 <button type="button" disabled={disabled} onClick={() => (revealed ? onReveal(false) : onOpen())}
-                    className={cn("flex min-w-0 flex-1 items-center gap-3 rounded-lg py-3 text-left", logoUrl ? "ps-2" : "ps-3")}>
+                    className={cn("flex min-w-0 flex-1 items-center gap-3 rounded-lg py-3 pe-3 text-left", logoUrl ? "ps-2" : "ps-3")}>
                     {logoUrl && <img src={logoUrl} alt="" className="size-10 shrink-0 rounded-md" onError={() => setLogoFailed(true)} />}
                     <span className="flex flex-1 flex-col gap-1 min-w-0">
                         <span className="text-base font-medium truncate">{site.name}</span>
                         <span className="text-sm text-ink-gray-6 truncate">{new URL(site.url).host}</span>
                     </span>
-                </button>
-                <button type="button" aria-label={_("Show remove")} aria-expanded={revealed} disabled={disabled} onClick={() => onReveal(!revealed)}
-                    className="flex size-12 shrink-0 items-center justify-center text-ink-gray-5">
-                    <ChevronLeft className="rotate-[calc(var(--reveal)*180deg)] transition-[rotate] duration-200 ease-out group-data-[dragging]:transition-none" />
                 </button>
             </div>
         </li>
@@ -188,10 +184,10 @@ export const SitePicker = () => {
         <main style={{ "--keyboard": `${keyboard}px` } as React.CSSProperties}
             className={cn("h-dvh overflow-hidden bg-surface-white text-ink-gray-9 flex flex-col gap-6 px-6 pt-[var(--inset-top)] max-w-md mx-auto w-full",
                 keyboard ? "justify-end pb-[calc(var(--keyboard)+0.75rem)]" : "justify-center pb-[max(var(--inset-bottom),1.5rem)]")}>
-            <img src={logo} alt="Raven" className="size-20 self-center" />
+            <img src={logo} alt="Raven" className="size-14 self-start" />
             {sites.length > 0 && (
                 <section className="flex flex-col gap-2">
-                    <p className="text-sm text-ink-gray-6">{sharing ? _("Share to") : _("Select an existing site")}</p>
+                    <p className="text-sm text-ink-gray-6">{sharing ? _("Share to") : _("Select a site")}</p>
                     {/* Capped at four and a half rows, the half hinting at more, so the form stays on screen and in reach.
                         19.5rem is the rest of the column with its bottom padding; the top inset and the keyboard come out too. */}
                     <ul className="flex flex-col gap-2 max-h-[min(20.5rem,calc(100dvh-var(--keyboard)-var(--inset-top)-19.5rem))] overflow-y-auto overscroll-contain scroll-fade">
@@ -235,8 +231,8 @@ export const SitePicker = () => {
             <AlertDialog open={removing !== null} onOpenChange={(o) => { if (!o) setRemoving(null) }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-semibold">{_("Remove {0}?", [removing?.name ?? ""])}</AlertDialogTitle>
-                        <AlertDialogDescription>{_("You will be logged out of this site on this device.")}</AlertDialogDescription>
+                        <AlertDialogTitle className="text-xl font-semibold">{_("Remove site?")}</AlertDialogTitle>
+                        <AlertDialogDescription>{removing && _("Removing {0} site will log you out of it on this device.", [removing.name])}</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>{_("Cancel")}</AlertDialogCancel>

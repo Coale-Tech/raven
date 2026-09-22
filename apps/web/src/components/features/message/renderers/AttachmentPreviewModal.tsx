@@ -22,6 +22,7 @@ import { cn } from "@lib/utils"
 import _ from "@lib/translate"
 import { attachmentPreviewAtom, type Attachment, type AttachmentPreviewState } from "@utils/attachmentPreview"
 import FileTypeIcon from "@components/common/FileIcons/FileTypeIcon"
+import { FileImage } from "@components/common/FileImage"
 
 /** Minimum horizontal travel (px) for a touch swipe to count as paging. */
 const SWIPE_THRESHOLD = 50
@@ -348,7 +349,8 @@ const AttachmentPreviewContent = ({
                     // other media kinds which share the SwipeDownToClose wrapper below.
                     <ZoomableImage
                         key={current.fileUrl}
-                        src={resolvedUrl ?? ""}
+                        // ZoomableImage resolves the site path itself; a resolved one would break on a second pass.
+                        src={current.fileUrl}
                         alt={current.fileName}
                         onDismiss={close}
                         onDismissProgress={onDismissProgress}
@@ -362,7 +364,10 @@ const AttachmentPreviewContent = ({
                     <SwipeDownToClose onDismiss={close} onProgress={onDismissProgress}>
                         {current.kind === "video" ? (
                             <video
-                                src={resolvedUrl}
+                                // iOS: #t paints the first frame, and playsInline keeps it in the viewer.
+                                src={resolvedUrl && `${resolvedUrl}#t=0.001`}
+                                playsInline
+                                preload="metadata"
                                 controls
                                 className="max-h-full md:max-w-[90%]"
                                 onClick={(event) => event.stopPropagation()}
@@ -378,7 +383,7 @@ const AttachmentPreviewContent = ({
                                     onClick={(event) => event.stopPropagation()}
                                     onTouchStart={(event) => event.stopPropagation()}
                                 >
-                                    <AudioPlayer src={resolvedUrl} />
+                                    <AudioPlayer src={current.fileUrl} />
                                 </div>
                             </div>
                         ) : canEmbedPdf ? (
@@ -519,7 +524,7 @@ const FilmstripThumb = forwardRef<HTMLDivElement, {
                 }}
             >
                 {attachment.kind === "image" ? (
-                    <img
+                    <FileImage
                         src={attachment.thumbnail || attachment.fileUrl}
                         alt={attachment.fileName}
                         className="h-full w-full object-cover"
