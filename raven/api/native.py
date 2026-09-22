@@ -2,34 +2,11 @@ import frappe
 import frappe.sessions
 from frappe.utils.change_log import get_versions
 
-from raven.api.raven_mobile import NATIVE_REDIRECT_URI
-from raven.www.raven import get_favicon
-
-# Bump to refuse older app builds; the app compares its own version against it.
-MIN_APP_VERSION = "3.0.0"
 # Origins the bundled app runs from: WKWebView on iOS, the Android WebView.
 APP_ORIGINS = ("capacitor://localhost", "https://localhost")
-
-
-@frappe.whitelist(allow_guest=True)
-def handshake():
-	"""What the app needs before login: OAuth client, versions, site identity."""
-	app_name = frappe.get_website_settings("app_name") or frappe.get_system_settings("app_name")
-	if not app_name or app_name == "Frappe":
-		app_name = "Raven"
-	client_id = frappe.db.get_single_value("Raven Settings", "oauth_client")
-	redirect_uris = (
-		frappe.db.get_value("OAuth Client", client_id, "redirect_uris") if client_id else ""
-	)
-	return {
-		# Only a client that accepts the app's redirect URI is usable.
-		"client_id": client_id if NATIVE_REDIRECT_URI in (redirect_uris or "") else None,
-		"raven_version": get_versions()["raven"]["version"],
-		"min_app_version": MIN_APP_VERSION,
-		"sitename": frappe.local.site,
-		"app_name": app_name,
-		"logo": get_favicon() or "/assets/raven/raven_logo.svg",
-	}
+# Sent by the app on every request. A browser page at https://localhost shares that origin but
+# cannot add a header of its own without a preflight, which is answered by the same rule.
+APP_HEADER = "X-Raven-App"
 
 
 @frappe.whitelist()
@@ -52,5 +29,12 @@ def set_cors():
 	allowed = set(APP_ORIGINS)
 	if frappe.conf.developer_mode:
 		allowed.add("http://localhost")
-	if origin in allowed:
+	if origin in allowed and from_app(request):
 		frappe.local.allow_cors = origin
+
+
+def from_app(request):
+	if request.method == "OPTIONS":
+		asked = request.headers.get("Access-Control-Request-Headers") or ""
+		return APP_HEADER.lower() in [h.strip().lower() for h in asked.split(",")]
+	return bool(request.headers.get(APP_HEADER))

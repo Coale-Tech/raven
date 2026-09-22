@@ -42,12 +42,15 @@ export const siteStorage = <T,>(): SyncStorage<T> =>
         },
     }))
 
+/** On every request from the app: the site allows the app's origins only when this header is present. */
+export const APP_HEADERS = { "X-Raven-App": "1" } as const
+
 /** fetch against the site: bearer token in native, session cookies in the browser. */
 export const siteFetch = (path: string, init: RequestInit = {}): Promise<Response> => {
     const headers = { ...(init.headers as Record<string, string> | undefined) }
     const url = siteUrl(path)
     // The bearer is for the site alone: an absolute url elsewhere goes without it.
-    if (active && url.startsWith(`${active.origin}/`)) headers.Authorization = `Bearer ${active.getToken()}`
+    if (active && url.startsWith(`${active.origin}/`)) Object.assign(headers, APP_HEADERS, { Authorization: `Bearer ${active.getToken()}` })
     return fetch(url, active ? { ...init, headers } : { ...init, credentials: "include", headers })
 }
 

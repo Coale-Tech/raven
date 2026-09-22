@@ -9,7 +9,7 @@ export type Site = {
     clientId: string
     logo?: string
     ravenVersion: string
-    /** The handshake asked for a newer app; a prompt, never a block. */
+    /** The site asked for a newer app; a prompt, never a block. */
     minAppVersion?: string
 }
 
@@ -44,18 +44,18 @@ const nativeGetJson: GetJson = async (url) => {
 
 export type ProbeResult = { site: Site } | { error: "unreachable" | "not-raven" | "site-too-old" | "no-client" }
 
-type Handshake = { client_id?: string | null; raven_version?: string; min_app_version?: string; sitename?: string; app_name?: string; logo?: string }
+type ClientInfo = { client_id?: string | null; raven_version?: string; min_app_version?: string; sitename?: string; app_name?: string; logo?: string }
 
 export const probeSite = async (url: string, getJson: GetJson = nativeGetJson): Promise<ProbeResult> => {
     let res: JsonResponse
     try {
-        res = await getJson(`${url}/api/method/raven.api.native.handshake`)
+        res = await getJson(`${url}/api/method/raven.api.raven_mobile.get_client_id`)
     } catch {
         return { error: "unreachable" }
     }
-    // 404 and 417 are Frappe's answers for a method it does not know: a site older than the native API.
+    // 404 and 417 are Frappe's answers for a method it does not know: a Raven older than the mobile API.
     if (res.status === 404 || res.status === 417) return { error: "site-too-old" }
-    const message = (res.data as { message?: Handshake } | null)?.message
+    const message = (res.data as { message?: ClientInfo } | null)?.message
     if (res.status !== 200 || !message?.sitename || !message.raven_version) return { error: "not-raven" }
     if (!message.client_id) return { error: "no-client" }
     return {
@@ -100,7 +100,7 @@ export const forgetSite = async (url: string) => {
 }
 
 /** Re-probes an open site and saves what changed; a guest call, so nothing is lost when it fails. */
-/** Completes a record saved without the handshake fields, as the shell app's are: it shares this app's id and storage. */
+/** Completes a record saved without the site's client info, as the shell app's are: it shares this app's id and storage. */
 export const completeSite = async (site: Site, getJson: GetJson = nativeGetJson): Promise<ProbeResult> => {
     const result = await probeSite(site.url, getJson)
     // A site that answers from another origin (apex → www) is saved under it; the entry it was opened from would be a second row.

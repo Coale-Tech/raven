@@ -44,7 +44,7 @@ describe("native (active site set)", () => {
         setActiveSite("https://a.com", () => "AT")
         const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok"))
         await siteFetch("/api/method/x", { headers: { "Content-Type": "application/json" } })
-        expect(f).toHaveBeenCalledWith("https://a.com/api/method/x", { headers: { "Content-Type": "application/json", Authorization: "Bearer AT" } })
+        expect(f).toHaveBeenCalledWith("https://a.com/api/method/x", { headers: { "Content-Type": "application/json", "X-Raven-App": "1", Authorization: "Bearer AT" } })
     })
     it("keeps the bearer from an absolute url on another origin", async () => {
         setActiveSite("https://a.com", () => "AT")
@@ -52,7 +52,7 @@ describe("native (active site set)", () => {
         await siteFetch("https://evil.example/private/files/x.png")
         await siteFetch("https://a.com.evil.example/x")
         await siteFetch("https://a.com/files/y.png")
-        expect(f.mock.calls.map((c) => (c[1] as RequestInit).headers)).toEqual([{}, {}, { Authorization: "Bearer AT" }])
+        expect(f.mock.calls.map((c) => (c[1] as RequestInit).headers)).toEqual([{}, {}, { "X-Raven-App": "1", Authorization: "Bearer AT" }])
     })
 })
 

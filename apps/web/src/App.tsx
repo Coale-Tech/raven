@@ -17,7 +17,7 @@ import { FrappeContext, FrappeProvider, type FrappeConfig } from 'frappe-react-s
 import { redirectToLoginIfSessionDied } from '@lib/authRecovery'
 import { initEmojiMart } from '@lib/emojiMart'
 import { isLoggedIn } from "@lib/sessionUser"
-import { siteKey } from "@lib/site"
+import { siteKey, APP_HEADERS } from '@lib/site'
 import { offlineCacheEnabled } from "@lib/offline"
 import { enableMessageCache } from "@stores/messages/messageCache"
 import { Toaster } from "@components/ui/sonner"
@@ -208,6 +208,7 @@ function App({ native }: { native?: NativeProvider }) {
         <FrappeProvider
           url={native?.url ?? (import.meta.env.VITE_FRAPPE_PATH ?? '')}
           tokenParams={native ? { useToken: true, type: "Bearer", token: native.getToken } : undefined}
+          customHeaders={native ? APP_HEADERS : undefined}
           socketPort={import.meta.env.VITE_SOCKET_PORT ? import.meta.env.VITE_SOCKET_PORT : undefined}
           swrConfig={{
             // NO global errorRetryCount: SWR's default retry is UNLIMITED

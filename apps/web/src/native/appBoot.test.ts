@@ -26,7 +26,7 @@ describe("loadBoot", () => {
         const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ message: boot })))
         expect(await loadBoot()).toBe("ok")
         expect(f.mock.calls[0][0]).toBe("https://a.com/api/method/raven.api.native.boot")
-        expect((f.mock.calls[0][1] as RequestInit).headers).toEqual({ Authorization: "Bearer AT" })
+        expect((f.mock.calls[0][1] as RequestInit).headers).toEqual({ "X-Raven-App": "1", Authorization: "Bearer AT" })
         expect(window.frappe.boot.sitename).toBe("a.com")
         expect(window.frappe._messages.Hello).toBe("Hallo")
         expect(sessionUser()).toEqual({ name: "alice@x.com", fullName: "Alice", image: "/files/a.png" })

@@ -53,9 +53,10 @@ Gates for the page: `cd apps/web && yarn tsc -b && yarn vitest run src/native`.
 
 ## Sites and sign-in
 
-- A site is added by origin; the app calls `raven.api.native.handshake` (guest). A site
-  without an OAuth client that lists `raven.thecommit.company://oauth` is refused with a
-  message for its admin.
+- A site is added by origin; the app calls `raven.api.raven_mobile.get_client_id` (guest),
+  the endpoint the React Native app used, so every 3.0.0 site passes. A site without an
+  OAuth client that lists `raven.thecommit.company://oauth` is refused with a message for
+  its admin.
 - Sign-in is OAuth PKCE in the system browser (`@capacitor/browser`); tokens live in the
   keychain per site (`raven.tokens.<origin>`) and are refreshed at 80% of their lifetime
   and once more on a 401. A refresh the site refuses (`invalid_grant`, revoked client) ends
@@ -71,7 +72,10 @@ Gates for the page: `cd apps/web && yarn tsc -b && yarn vitest run src/native`.
   `data_extraction_rules.xml`): the stored tokens are encrypted with a device-bound key, and
   a copy on another device could not be read.
 - API calls use the sdk with a bearer token; the site allows the app's origins through
-  `raven.api.native.set_cors` (`before_request`), so sites need no CORS configuration.
+  `raven.api.native.set_cors` (`before_request`), so sites need no CORS configuration. The
+  app sends `X-Raven-App` on every request and the hook requires it: a browser page at
+  `https://localhost` shares the Android app's origin but cannot add that header. A site
+  whose own config sets `allow_cors` answers before the hook and is not covered by it.
 - Set up once per site (Raven Settings → OAuth Client):
   `bench --site <site> execute raven.api.raven_mobile.create_oauth_client`.
 - Local bench: add `http://10.0.2.2:8004` on the emulator, `http://127.0.0.1:8004` on the
@@ -83,16 +87,17 @@ Gates for the page: `cd apps/web && yarn tsc -b && yarn vitest run src/native`.
 Any site with the native API opens, whatever its version. The site's `raven_version` is compared with the version the
 bundle was built from (`__RAVEN_VERSION__`, read from `raven/__init__.py` at build): a
 different patch is silent; a different minor or major opens with a warning toast naming
-both versions. `min_app_version` from the handshake only drives an "update the app"
+both versions. `min_app_version` from the site only drives an "update the app"
 toast, never a block. Both notices are queued in Preferences by the picker
 (`pendingNotice`) and shown once the app is up.
 
-A site without the native API (no `raven.api.native.handshake`, e.g. a 3.0.0 site) is
-refused with "runs an older Raven". Opening such sites in a bridge-less native WebView
-screen is planned (spec, layer 7).
+A site older than the mobile API (no `get_client_id`) is refused with "runs an older
+Raven". A 3.0.0 site passes the picker but still needs this branch's server side to open:
+`raven.api.native.boot` for the session data, and `set_cors` for the app's origins.
+Opening such sites in a bridge-less native WebView screen is planned (spec, layer 7).
 
-A site row shows the logo the handshake named, or the site's initial on a tile when there
-is none or it fails to load.
+A site row shows a favicon the site set for itself (`use_website_favicon` in Raven
+Settings, a public file), and nothing otherwise: Raven's own artwork is the app's logo.
 
 ## The app on a site
 
@@ -280,9 +285,9 @@ therefore load through `RavenMedia` (`src/native/mediaUrl.ts`, `media.ts`):
 The store versions must be higher than the React Native listing (1.1.4); the project
 carries 3.0.0 / build 300 (`project.pbxproj`, `android/app/build.gradle`).
 
-- App icons + splash art: done. Android uses vector drawables built from
-  `raven/public/raven_logo.svg`; iOS carries the 1024 icon and two splash images from the
-  same SVG.
+- App icons + splash art: done. The splash is black in both themes, with light status bar
+  icons over it. Android uses vector drawables built from `raven/public/raven_logo.svg`;
+  iOS carries the 1024 icon and one splash image from the same SVG.
 - Firebase config files present on the release machine (`google-services.json`,
   `GoogleService-Info.plist`); `capacitor.config.local.json` absent.
 - iOS: verify the archived `.ipa` entitlement `aps-environment=production`; Apple Push
