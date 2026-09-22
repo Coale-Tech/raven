@@ -280,10 +280,53 @@ therefore load through `RavenMedia` (`src/native/mediaUrl.ts`, `media.ts`):
   Android `adjustPan`), matching the installed iOS PWA; the composer lifts by
   `--keyboard-height` (`keyboard.ts`) and the OS pans a covered field into view.
 
+## Release to TestFlight
+
+`yarn native:testflight` from the repo root runs every step below: it bumps the build number,
+builds, archives and uploads. `yarn native:testflight --no-upload` stops after the archive and
+leaves the build number alone. The steps, for doing it by hand or in Xcode, run from
+`apps/native`, on a Mac signed in to Xcode with the team's Apple account. The upload uses the
+account's cloud-managed distribution certificate, so no certificate is needed locally.
+
+1. Bump the build number: every `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`
+   (four entries, app and share extension), and `versionCode` in `android/app/build.gradle` to
+   match. App Store Connect refuses a build number it has seen.
+
+   ```bash
+   sed -i '' 's/CURRENT_PROJECT_VERSION = 301;/CURRENT_PROJECT_VERSION = 302;/' ios/App/App.xcodeproj/project.pbxproj
+   ```
+
+2. Build the web bundle with the local-only values blanked. Vite reads `.env.local` and
+   `.env.native.local` in every mode, so a plain build ships the local socket port and site
+   name; real environment variables take precedence over those files.
+
+   ```bash
+   (cd ../web && VITE_SOCKET_PORT= VITE_SITE_NAME= yarn build:native)
+   ```
+
+3. Sync into the iOS project without the dev override, then put it back.
+
+   ```bash
+   mv capacitor.config.local.json /tmp/ 2>/dev/null; npx cap sync ios; mv /tmp/capacitor.config.local.json . 2>/dev/null
+   ```
+
+4. Archive, then upload. The upload prints `Upload succeeded` and ends with `EXPORT SUCCEEDED`.
+
+   ```bash
+   xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+     -destination 'generic/platform=iOS' -archivePath release/Raven.xcarchive -allowProvisioningUpdates archive
+   xcodebuild -exportArchive -archivePath release/Raven.xcarchive -exportPath release/upload \
+     -exportOptionsPlist ios/ExportOptions.plist -allowProvisioningUpdates
+   ```
+
+5. In App Store Connect the build appears after processing, usually 10 to 30 minutes, and
+   reaches testers without an export compliance question: `Info.plist` declares
+   `ITSAppUsesNonExemptEncryption` false, since the app uses standard HTTPS only.
+
 ## Before first store submission
 
 The store versions must be higher than the React Native listing (1.1.4); the project
-carries 3.0.0 / build 300 (`project.pbxproj`, `android/app/build.gradle`).
+carries 3.0.0 / build 301 (`project.pbxproj`, `android/app/build.gradle`).
 
 - App icons + splash art: done. The splash is black in both themes, with light status bar
   icons over it. Android uses vector drawables built from `raven/public/raven_logo.svg`;

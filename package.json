@@ -19,7 +19,8 @@
     "native:build": "cd apps/web && yarn build:native",
     "native:sync": "yarn native:build && cd apps/native && yarn sync",
     "native:ios": "cd apps/native && yarn ios",
-    "native:android": "cd apps/native && yarn android"
+    "native:android": "cd apps/native && yarn android",
+    "native:testflight": "cd apps/native && yarn testflight"
   },
   "keywords": [],
   "author": "",

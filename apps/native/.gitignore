@@ -14,3 +14,6 @@ ios/App/App/GoogleService-Info.plist
 *.p12
 *.mobileprovision
 .env*
+
+# TestFlight archives and exports (README "Release to TestFlight")
+release/

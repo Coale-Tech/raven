@@ -6,7 +6,8 @@
   "scripts": {
     "sync": "cap sync",
     "ios": "cap open ios",
-    "android": "cap open android"
+    "android": "cap open android",
+    "testflight": "bash scripts/testflight.sh"
   },
   "dependencies": {
     "@capacitor-firebase/messaging": "8.4.0",
