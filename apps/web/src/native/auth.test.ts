@@ -58,13 +58,8 @@ describe("parseCallback", () => {
 
 const makeDeps = (overrides: Partial<AuthDeps> = {}) => {
     const stored = new Map<string, StoredTokens>()
-    let urlHandler: ((url: string) => void) | null = null
-    let finishedHandler: (() => void) | null = null
     const deps: AuthDeps = {
-        openBrowser: vi.fn(async () => { }),
-        closeBrowser: vi.fn(async () => { }),
-        onAppUrlOpen: vi.fn(async (h) => { urlHandler = h; return () => { urlHandler = null } }),
-        onBrowserFinished: vi.fn(async (h) => { finishedHandler = h; return () => { finishedHandler = null } }),
+        authorize: vi.fn(async () => `${REDIRECT_URL}?code=CODE&state=STATE`),
         post: vi.fn(async () => ({ status: 200, data: { access_token: "AT", refresh_token: "RT", expires_in: 3600 } })),
         store: {
             get: async (site) => stored.get(site) ?? null,
@@ -75,52 +70,36 @@ const makeDeps = (overrides: Partial<AuthDeps> = {}) => {
         now: () => 1_000_000,
         ...overrides,
     }
-    return { deps, stored, redirect: (url: string) => urlHandler?.(url), finish: () => finishedHandler?.() }
+    return { deps, stored }
 }
 
 describe("signIn", () => {
-    it("opens the browser, exchanges the code with the verifier, stores tokens with expiry", async () => {
-        const { deps, stored, redirect } = makeDeps()
-        const pending = signIn("https://a.com", "C", deps)
-        await vi.waitFor(() => expect(deps.openBrowser).toHaveBeenCalled())
-        redirect(`${REDIRECT_URL}?code=CODE&state=STATE`)
-        const tokens = await pending
+    it("opens the site's page, exchanges the code with the verifier, stores tokens with expiry", async () => {
+        const { deps, stored } = makeDeps()
+        const tokens = await signIn("https://a.com", "C", deps)
+        expect(deps.authorize).toHaveBeenCalledWith(expect.stringContaining("https://a.com/api/method/frappe.integrations.oauth2.authorize?"))
         expect(deps.post).toHaveBeenCalledWith("https://a.com/api/method/frappe.integrations.oauth2.get_token", {
             grant_type: "authorization_code", code: "CODE", client_id: "C", redirect_uri: REDIRECT_URL, code_verifier: "VERIFIER",
         })
         expect(tokens).toEqual({ accessToken: "AT", refreshToken: "RT", expiresAt: 1_000_000 + 3600 * 1000 })
         expect(stored.get("https://a.com")).toEqual(tokens)
-        expect(deps.closeBrowser).toHaveBeenCalled()
     })
-    it("ignores a callback with a foreign state", async () => {
-        const { deps, redirect } = makeDeps()
-        const pending = signIn("https://a.com", "C", deps)
-        await vi.waitFor(() => expect(deps.openBrowser).toHaveBeenCalled())
-        redirect(`${REDIRECT_URL}?code=CODE&state=OTHER`)
-        redirect(`${REDIRECT_URL}?code=CODE&state=STATE`)
-        await pending
-        expect(deps.post).toHaveBeenCalledTimes(1)
+    it("rejects a callback that answers another request", async () => {
+        const { deps } = makeDeps({ authorize: vi.fn(async () => `${REDIRECT_URL}?code=CODE&state=OTHER`) })
+        await expect(signIn("https://a.com", "C", deps)).rejects.toThrow("different request")
+        expect(deps.post).not.toHaveBeenCalled()
     })
     it("rejects when the user denies", async () => {
-        const { deps, redirect } = makeDeps()
-        const pending = signIn("https://a.com", "C", deps)
-        await vi.waitFor(() => expect(deps.openBrowser).toHaveBeenCalled())
-        redirect(`${REDIRECT_URL}?error=access_denied`)
-        await expect(pending).rejects.toThrow("access_denied")
+        const { deps } = makeDeps({ authorize: vi.fn(async () => `${REDIRECT_URL}?error=access_denied`) })
+        await expect(signIn("https://a.com", "C", deps)).rejects.toThrow("access_denied")
     })
-    it("rejects as cancelled when the browser closes without a redirect", async () => {
-        const { deps, finish } = makeDeps()
-        const pending = signIn("https://a.com", "C", deps)
-        await vi.waitFor(() => expect(deps.openBrowser).toHaveBeenCalled())
-        finish()
-        await expect(pending).rejects.toThrow("cancelled")
+    it("rejects as cancelled when the page closes without a redirect", async () => {
+        const { deps } = makeDeps({ authorize: vi.fn(async () => null) })
+        await expect(signIn("https://a.com", "C", deps)).rejects.toThrow("cancelled")
     })
     it("rejects when the token exchange fails and stores nothing", async () => {
-        const { deps, stored, redirect } = makeDeps({ post: vi.fn(async () => ({ status: 401, data: { error: "invalid_grant" } })) })
-        const pending = signIn("https://a.com", "C", deps)
-        await vi.waitFor(() => expect(deps.openBrowser).toHaveBeenCalled())
-        redirect(`${REDIRECT_URL}?code=CODE&state=STATE`)
-        await expect(pending).rejects.toThrow("invalid_grant")
+        const { deps, stored } = makeDeps({ post: vi.fn(async () => ({ status: 401, data: { error: "invalid_grant" } })) })
+        await expect(signIn("https://a.com", "C", deps)).rejects.toThrow("invalid_grant")
         expect(stored.size).toBe(0)
     })
 })

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Capacitor
 
@@ -13,14 +14,41 @@ public class RavenShellPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "clearShareIntent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showNotification", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "applyTheme", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authorize", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "watchNotifications", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSiteCount", returnType: CAPPluginReturnPromise),
     ]
+
+    // Held for the sheet's lifetime: a released session closes itself.
+    private var signIn: ASWebAuthenticationSession?
 
     override public func load() {
         // Taps on notifications posted here route to the push handler, so the page
         // gets the same notificationActionPerformed event as for a push.
         bridge?.notificationRouter.localNotificationHandler = self
+    }
+
+    // MARK: - Sign-in
+
+    /// The site's sign-in page in a private session, for OAuth (contract: apps/web/src/native/auth.ts).
+    /// Safari's own cookies would sign the same account in again with no way to choose another.
+    @objc func authorize(_ call: CAPPluginCall) {
+        guard let address = call.getString("url"), let url = URL(string: address), let scheme = call.getString("scheme") else {
+            return call.reject("A sign-in needs a url and a callback scheme")
+        }
+        DispatchQueue.main.async {
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme) { [weak self] callback, error in
+                self?.signIn = nil
+                if let callback = callback { return call.resolve(["url": callback.absoluteString]) }
+                let cancelled = (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin
+                if cancelled { return call.resolve(["cancelled": true]) }
+                call.reject(error?.localizedDescription ?? "Sign-in failed")
+            }
+            session.prefersEphemeralWebBrowserSession = true
+            session.presentationContextProvider = self
+            self.signIn = session
+            session.start()
+        }
     }
 
     // MARK: - Foreground notifications
@@ -93,5 +121,11 @@ extension RavenShellPlugin: NotificationHandlerProtocol {
 
     public func didReceive(response: UNNotificationResponse) {
         bridge?.notificationRouter.pushNotificationHandler?.didReceive(response: response)
+    }
+}
+
+extension RavenShellPlugin: ASWebAuthenticationPresentationContextProviding {
+    public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        bridge?.viewController?.view.window ?? ASPresentationAnchor()
     }
 }

@@ -1,7 +1,9 @@
 import { codeChallengeS256, randomString } from "./pkce"
+import { ravenShell } from "./shell"
 
+export const REDIRECT_SCHEME = "raven.thecommit.company"
 // Host segment is required: Foundation parses "scheme:?code=…" with a nil query.
-export const REDIRECT_URL = "raven.thecommit.company://oauth"
+export const REDIRECT_URL = `${REDIRECT_SCHEME}://oauth`
 const SCOPE = "all openid"
 const TOKEN_ENDPOINT = "/api/method/frappe.integrations.oauth2.get_token"
 
@@ -61,10 +63,8 @@ export const tokenStore = {
 type TokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; error?: string }
 
 export type AuthDeps = {
-    openBrowser: (url: string) => Promise<void>
-    closeBrowser: () => Promise<void>
-    onAppUrlOpen: (handler: (url: string) => void) => Promise<() => void>
-    onBrowserFinished: (handler: () => void) => Promise<() => void>
+    /** The redirect the site came back with, or null when the user closed the page. */
+    authorize: (url: string) => Promise<string | null>
     post: (url: string, form: Record<string, string>) => Promise<{ status: number; data: unknown }>
     store: typeof tokenStore
     pkce: { verifier: () => string; challenge: (v: string) => Promise<string>; state: () => string }
@@ -72,17 +72,10 @@ export type AuthDeps = {
 }
 
 export const defaultDeps: AuthDeps = {
-    openBrowser: async (url) => { const { Browser } = await import("@capacitor/browser"); await Browser.open({ url }) },
-    closeBrowser: async () => { const { Browser } = await import("@capacitor/browser"); await Browser.close() },
-    onAppUrlOpen: async (handler) => {
-        const { App } = await import("@capacitor/app")
-        const handle = await App.addListener("appUrlOpen", (e) => handler(e.url))
-        return () => { handle.remove().catch(() => { }) }
-    },
-    onBrowserFinished: async (handler) => {
-        const { Browser } = await import("@capacitor/browser")
-        const handle = await Browser.addListener("browserFinished", () => handler())
-        return () => { handle.remove().catch(() => { }) }
+    authorize: async (url) => {
+        const { plugin } = await ravenShell()
+        const { url: callback } = await plugin.authorize({ url, scheme: REDIRECT_SCHEME, redirect: REDIRECT_URL })
+        return callback ?? null
     },
     // Native request: token posts need no CORS and carry no cookies. Boot waits on a refresh before
     // anything renders, so it is bounded: the plugin's own default is ten minutes.
@@ -113,49 +106,26 @@ const exchange = async (site: string, form: Record<string, string>, prev: Stored
     }
 }
 
-/** Waits for the redirect back from the browser, keyed by `state`. */
-const awaitCallback = (state: string, deps: AuthDeps): Promise<Callback> =>
-    new Promise<Callback>((resolve, reject) => {
-        let settled = false
-        let removeUrl = () => { }
-        let removeFinished = () => { }
-        const finish = (fn: () => void) => {
-            if (settled) return
-            settled = true
-            fn()
-            removeUrl()
-            removeFinished()
-        }
-        deps.onAppUrlOpen((url) => {
-            const cb = parseCallback(url)
-            if (!cb) return
-            // Frappe's deny redirect carries no state; anything else must carry ours.
-            if (cb.error) {
-                if (cb.state === state || (cb.state === undefined && cb.error === "access_denied")) finish(() => reject(new Error(cb.error_description || cb.error)))
-                return
-            }
-            if (cb.state !== state) return
-            finish(() => (cb.code ? resolve(cb) : reject(new Error("Callback carried no authorization code"))))
-        }).then((remove) => { removeUrl = remove })
-        deps.onBrowserFinished(() => {
-            // The redirect can arrive just after the sheet closes on iOS.
-            setTimeout(() => finish(() => reject(new Error("Sign-in was cancelled"))), 750)
-        }).then((remove) => { removeFinished = remove })
-    })
+/** The redirect, checked against the request it answers. */
+const readCallback = (url: string | null, state: string): Callback => {
+    if (url === null) throw new Error("Sign-in was cancelled")
+    const callback = parseCallback(url)
+    if (!callback) throw new Error("Sign-in came back to an address that is not ours")
+    // Frappe's deny redirect carries no state; anything else must carry ours.
+    if (callback.error) {
+        if (callback.state === state || callback.state === undefined) throw new Error(callback.error_description || callback.error)
+        throw new Error("Sign-in answered a different request")
+    }
+    if (callback.state !== state) throw new Error("Sign-in answered a different request")
+    if (!callback.code) throw new Error("Callback carried no authorization code")
+    return callback
+}
 
 export const signIn = async (site: string, clientId: string, deps: AuthDeps = defaultDeps): Promise<StoredTokens> => {
     const verifier = deps.pkce.verifier()
     const state = deps.pkce.state()
     const challenge = await deps.pkce.challenge(verifier)
-    // Listen before opening the browser: the redirect can arrive instantly.
-    const pending = awaitCallback(state, deps)
-    await deps.openBrowser(buildAuthorizeUrl(site, clientId, state, challenge))
-    let callback: Callback
-    try {
-        callback = await pending
-    } finally {
-        await deps.closeBrowser().catch(() => { })
-    }
+    const callback = readCallback(await deps.authorize(buildAuthorizeUrl(site, clientId, state, challenge)), state)
     const tokens = await exchange(site, {
         grant_type: "authorization_code",
         code: callback.code ?? "",

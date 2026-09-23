@@ -12,6 +12,16 @@ export const NATIVE_TOKEN_KEY = "raven-native-fcm-token"
 /** Preferences key mirroring the token per site, for unsubscribing a site removed in the picker. */
 const pushTokenKey = (origin: string) => `pushToken.${origin}`
 
+/** A site taken off the device asks for nothing when it comes back. */
+export const forgetPushPreference = (url: string) => withPrefs((p) => p.remove({ key: pushWantedKey(url) }))
+
+/** Preferences key remembering that a site had push on, which a sign-out leaves behind. */
+const pushWantedKey = (origin: string) => `pushWanted.${origin}`
+const rememberPush = (wanted: boolean) => {
+    const key = pushWantedKey(siteOrigin())
+    return withPrefs((p) => (wanted ? p.set({ key, value: "1" }) : p.remove({ key })))
+}
+
 const isNativePushEnabled = () => localStorage.getItem(siteKey(NATIVE_TOKEN_KEY)) !== null
 
 // Registered once; the proxy is wrapped because a promise resolved with it never settles.
@@ -41,8 +51,11 @@ export const syncToken = (token: string) => (syncing = syncing.catch(() => { }).
 const subscribeToken = async (token: string) => {
     const old = localStorage.getItem(siteKey(NATIVE_TOKEN_KEY))
     if (old === token) return
-    if (old) await callNotificationAPI("unsubscribe", { fcm_token: old }).catch(() => { })
-    await callNotificationAPI("subscribe", { fcm_token: token, environment: "Mobile", device_information: `${nativePlatform()} native app` })
+    // Two rows, two requests, no order between them: a rotation costs one round trip, not two.
+    await Promise.all([
+        old ? callNotificationAPI("unsubscribe", { fcm_token: old }).catch(() => { }) : undefined,
+        callNotificationAPI("subscribe", { fcm_token: token, environment: "Mobile", device_information: `${nativePlatform()} native app` }),
+    ])
     localStorage.setItem(siteKey(NATIVE_TOKEN_KEY), token)
     await mirrorToken(token).catch(() => { })
 }
@@ -53,10 +66,13 @@ export const enableNativePush = async (): Promise<boolean> => {
     if (receive !== "granted") return false
     const { token } = await fm.getToken()
     await syncToken(token)
+    await rememberPush(true).catch(() => { })
     return true
 }
 
-export const disableNativePush = async (): Promise<void> => {
+/** `keep` when the site is only being signed out of: signing in again turns push back on. */
+export const disableNativePush = async (keep = false): Promise<void> => {
+    if (!keep) await rememberPush(false).catch(() => { })
     const token = localStorage.getItem(siteKey(NATIVE_TOKEN_KEY))
     if (!token) return
     localStorage.removeItem(siteKey(NATIVE_TOKEN_KEY))
@@ -164,8 +180,24 @@ export const subscribeForeignSiteNotifications = (): (() => void) =>
     }))
 
 /** Startup: refresh a rotated token for a site that already subscribed. */
+/** Push a site had on before a sign-out, which this device may still have permission for. */
+const pushWanted = async () => {
+    const { value } = await withPrefs((p) => p.get({ key: pushWantedKey(siteOrigin()) }))
+    return value === "1"
+}
+
 export const initNativePush = () => {
-    if (!isNativePushEnabled()) return
+    if (!isNativePushEnabled()) {
+        // Signing in again picks up where the sign-out left off, and never asks: an unanswered
+        // permission would be a prompt nobody opened settings for.
+        void pushWanted().then(async (wanted) => {
+            if (!wanted) return
+            const { fm } = await messaging()
+            const { receive } = await fm.checkPermissions()
+            if (receive === "granted") await enableNativePush()
+        }).catch(() => { })
+        return
+    }
     messaging().then(async ({ fm }) => {
         const { receive } = await fm.checkPermissions()
         if (receive === "denied") { await disableNativePush(); return }

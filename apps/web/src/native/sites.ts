@@ -104,6 +104,7 @@ export const wipeSiteData = async (url: string) => {
     Object.keys(localStorage).filter((key) => key.startsWith(prefix)).forEach((key) => localStorage.removeItem(key))
     indexedDB.deleteDatabase(`${prefix}RavenDB`)
     await import("./download").then((m) => m.clearMediaCache()).catch(() => { })
+    await import("./push").then((m) => m.forgetPushPreference(url)).catch(() => { })
 }
 
 export const forgetSite = async (url: string) => {

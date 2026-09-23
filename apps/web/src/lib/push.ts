@@ -191,8 +191,9 @@ export const enablePush = async (): Promise<boolean> => {
 }
 
 /** Disable push for this device: delete the FCM token + the server record. Best-effort. */
-export const disablePush = async (): Promise<void> => {
-    if (import.meta.env.VITE_NATIVE) return (await import("../native/push")).disableNativePush()
+/** `keep` when a sign-out is what turns it off: the next sign-in turns it back on. */
+export const disablePush = async (keep = false): Promise<void> => {
+    if (import.meta.env.VITE_NATIVE) return (await import("../native/push")).disableNativePush(keep)
     const token = localStorage.getItem(siteKey(TOKEN_STORAGE_KEY))
     if (!token) return
     // Clear local state first — the device should read "disabled" even if the

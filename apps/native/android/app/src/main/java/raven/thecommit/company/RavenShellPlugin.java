@@ -62,6 +62,23 @@ public class RavenShellPlugin extends Plugin {
         });
     }
 
+    // ---- sign-in -------------------------------------------------------------------
+
+    @PluginMethod
+    public void authorize(PluginCall call) {
+        String url = call.getString("url"), redirect = call.getString("redirect");
+        if (url == null || redirect == null) {
+            call.reject("A sign-in needs a url and a redirect");
+            return;
+        }
+        getActivity().runOnUiThread(() -> AuthorizeSession.start(getActivity(), url, redirect, (callbackUrl) -> {
+            JSObject result = new JSObject();
+            if (callbackUrl != null) result.put("url", callbackUrl);
+            else result.put("cancelled", true);
+            call.resolve(result);
+        }));
+    }
+
     // ---- share out ----------------------------------------------------------------
     // Own chooser so Raven can be excluded from it (the Share plugin cannot), and no
     // result tracking, so nothing is left "in progress" if the chooser never reports back.

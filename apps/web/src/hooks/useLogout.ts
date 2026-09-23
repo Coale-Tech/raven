@@ -95,9 +95,10 @@ export function useLogout(): { logout: () => Promise<void>; isLoggingOut: boolea
     const logout = useCallback(async () => {
         setIsLoggingOut(true)
 
-        // Best-effort: stop this device receiving pushes for a logged-out session.
+        // Best-effort: stop this device receiving pushes for a logged-out session, remembering
+        // that this site had them so signing in again does not start from off.
         try {
-            await disablePush()
+            await disablePush(true)
         } catch (e) {
             console.error("Failed to disable push notifications on logout", e)
         }

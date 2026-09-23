@@ -11,6 +11,8 @@ export type RavenShellPlugin = {
     share(options: { uri: string; title?: string; type?: string }): Promise<void>
     /** Re-read the mirrored app theme (native/theme.ts) and theme the canvas behind the page with it. */
     applyTheme(): Promise<void>
+    /** The site's sign-in page in a session of its own: no cookies from an earlier account, none kept after. */
+    authorize(options: { url: string; scheme: string; redirect: string }): Promise<{ url?: string; cancelled?: boolean }>
     /** Android: the page is listening for pushes, so the app's own service leaves them to it. */
     watchNotifications(options: { watching: boolean }): Promise<void>
     /** iOS: how many sites are signed in, which decides whether a notification names the site. */
