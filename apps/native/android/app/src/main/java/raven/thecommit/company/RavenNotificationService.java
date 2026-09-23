@@ -18,16 +18,13 @@ public class RavenNotificationService extends MessagingService {
         Map<String, String> data = message.getData();
         String title = data.get("push_title");
         if (title == null || title.isEmpty() || RavenApplication.pageHandlesNotifications()) return;
-        String workspace = data.get("workspace");
         String workspaceImage = data.get("workspace_image");
-        // A channel is headed by its workspace: two workspaces can name a channel the same.
-        String header = empty(workspace) ? data.get("sitename") : workspace + " · " + data.get("sitename");
         // A channel wears its workspace's logo; a direct message wears the sender's face.
         String face = empty(workspaceImage) ? data.get("image") : workspaceImage;
         JSObject options = new JSObject();
         options.put("title", title);
         options.put("body", data.get("push_body"));
-        options.put("site", header);
+        options.put("site", data.get("sitename"));
         options.put("image", face);
         options.put("tag", data.get("tag"));
         JSObject payload = new JSObject();

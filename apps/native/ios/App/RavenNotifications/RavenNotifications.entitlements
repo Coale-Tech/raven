@@ -4,8 +4,6 @@
 <dict>
 	<key>com.apple.developer.usernotifications.communication</key>
 	<true/>
-	<key>aps-environment</key>
-	<string>development</string>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.raven.thecommit.company</string>

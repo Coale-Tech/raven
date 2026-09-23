@@ -14,6 +14,7 @@ public class RavenShellPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "showNotification", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "applyTheme", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "watchNotifications", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setSiteCount", returnType: CAPPluginReturnPromise),
     ]
 
     override public func load() {
@@ -70,6 +71,12 @@ public class RavenShellPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func clearShareIntent(_ call: CAPPluginCall) {
         // send-intent marks a delivered share as processed itself.
+        call.resolve()
+    }
+
+    @objc func setSiteCount(_ call: CAPPluginCall) {
+        // The notification extension reads this: it names the site only when several are signed in.
+        UserDefaults(suiteName: "group.raven.thecommit.company")?.set(call.getInt("count") ?? 0, forKey: "siteCount")
         call.resolve()
     }
 

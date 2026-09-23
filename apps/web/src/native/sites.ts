@@ -74,11 +74,23 @@ export const probeSite = async (url: string, getJson: GetJson = nativeGetJson): 
 
 export const loadSites = async (): Promise<Site[]> => {
     const { value } = await withPrefs((p) => p.get({ key: SITES_KEY }))
-    if (!value) return []
-    try { return JSON.parse(value) as Site[] } catch { return [] }
+    let sites: Site[] = []
+    try { sites = value ? (JSON.parse(value) as Site[]) : [] } catch { sites = [] }
+    void tellShellSiteCount(sites.length)
+    return sites
 }
 
-const writeSites = (sites: Site[]) => withPrefs((p) => p.set({ key: SITES_KEY, value: JSON.stringify(sites) }))
+/** iOS names the site on a notification only when there is more than one to tell apart. */
+const tellShellSiteCount = (count: number) =>
+    import("./shell")
+        .then(({ ravenShell }) => ravenShell())
+        .then(({ plugin }) => plugin.setSiteCount({ count }))
+        .catch(() => { })
+
+const writeSites = async (sites: Site[]) => {
+    await withPrefs((p) => p.set({ key: SITES_KEY, value: JSON.stringify(sites) }))
+    await tellShellSiteCount(sites.length)
+}
 
 /** Front of the list: the picker shows the last used site first. */
 export const saveSite = async (site: Site) => {
