@@ -154,6 +154,15 @@ def send_push_notification_via_raven_cloud(message, raven_settings):
 
 		image = get_image_absolute_url(message_owner_image)
 
+		# A channel is shown as its workspace: two workspaces can name a channel the same.
+		workspace_name, workspace_image = "", ""
+		if not channel_doc.is_direct_message and channel_doc.workspace:
+			# A workspace deleted under the channel leaves the notification without one, not unsent.
+			workspace_name, logo = frappe.get_cached_value(
+				"Raven Workspace", channel_doc.workspace, ["workspace_name", "logo"]
+			) or ("", "")
+			workspace_image = get_image_absolute_url(logo) if logo else ""
+
 		data = {
 			"base_url": frappe.utils.get_url(),
 			"message_url": url,
@@ -168,6 +177,8 @@ def send_push_notification_via_raven_cloud(message, raven_settings):
 			"is_thread": "1" if channel_doc.is_thread else "0",
 			"creation": get_milliseconds_since_epoch(message.creation),
 			"image": image if image else "",
+			"workspace": workspace_name or "",
+			"workspace_image": workspace_image or "",
 		}
 
 		if replied_users:
