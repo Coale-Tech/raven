@@ -54,7 +54,8 @@ class TestAppPushSplit(IntegrationTestCase):
 		split = split_for_app([self.message()])
 		by_token = {message["tokens"][0]: message for message in split}
 		self.assertEqual(set(by_token), {"TOKEN-APP", "TOKEN-WEB"})
-		self.assertEqual(by_token["TOKEN-WEB"]["notification"]["title"], "Arya in #north")
+		# The device draws the web copy, so its title names the site; the app draws the site as a header.
+		self.assertEqual(by_token["TOKEN-WEB"]["notification"]["title"], with_site("Arya in #north"))
 		self.assertNotIn("notification", by_token["TOKEN-APP"])
 		self.assertEqual(by_token["TOKEN-APP"]["data"]["push_title"], "Arya in #north")
 		self.assertEqual(by_token["TOKEN-APP"]["data"]["push_body"], "Winter is here")

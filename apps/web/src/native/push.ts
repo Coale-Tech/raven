@@ -157,9 +157,10 @@ export const subscribeForeignSiteNotifications = (): (() => void) =>
         const site = new URL(target.url).hostname
         // Same tag form as the relay's, so the other site's sweep can clear it.
         const tag = data.channel_id ? `${site}:${data.channel_id}` : undefined
-        // The relay suffixes the site onto the title for OS-rendered pushes; here it is the header.
-        const title = (notification.title ?? "").replace(/ · [^·]+$/, "")
-        await shell.showNotification({ title, body: notification.body, site, image: data.image || undefined, tag, data })
+        // The app's own push carries its wording in the data; a device-drawn one has the site on its title.
+        const title = data.push_title ?? (notification.title ?? "").replace(/ · [^·]+$/, "")
+        const body = data.push_body ?? notification.body
+        await shell.showNotification({ title, body, site, image: data.image || undefined, tag, data })
     }))
 
 /** Startup: refresh a rotated token for a site that already subscribed. */

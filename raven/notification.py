@@ -14,7 +14,7 @@ MAX_NOTIFICATION_CONTENT_LENGTH = 1000
 
 
 def with_site(title: str) -> str:
-	"""The site a notification came from: a device signed in to several cannot tell from the app name."""
+	"""Names the site in a title the device itself draws; the app draws the site as a header instead."""
 	return f"{title} · {get_site_name()}"
 
 
@@ -175,7 +175,7 @@ def send_push_notification_via_raven_cloud(message, raven_settings):
 				{
 					"users": replied_users,
 					"notification": {
-						"title": with_site(f"{message_owner} replied{channel_name}"),
+						"title": f"{message_owner} replied{channel_name}",
 						"body": truncated_content,
 					},
 					"data": data,
@@ -190,7 +190,7 @@ def send_push_notification_via_raven_cloud(message, raven_settings):
 				{
 					"users": mentioned_users,
 					"notification": {
-						"title": with_site(f"{message_owner} mentioned you{channel_name}"),
+						"title": f"{message_owner} mentioned you{channel_name}",
 						"body": truncated_content,
 					},
 					"data": data,
@@ -205,7 +205,7 @@ def send_push_notification_via_raven_cloud(message, raven_settings):
 				{
 					"users": final_users,
 					"notification": {
-						"title": with_site(f"{message_owner}{channel_name}"),
+						"title": f"{message_owner}{channel_name}",
 						"body": truncated_content,
 					},
 					"data": data,
@@ -228,7 +228,7 @@ ANDROID_APP_DEVICE = "android native app"
 def split_for_app(messages):
 	"""Android draws any push carrying a title itself, so the app's copy carries none.
 
-	The app's messaging service builds the chat-style notification from the data instead.
+	The app's notification service builds the chat-style notification from the data instead.
 	"""
 	tokens = push_tokens({user for message in messages for user in message.get("users", [])})
 	split = []
@@ -239,10 +239,11 @@ def split_for_app(messages):
 			app_tokens += app
 			other_tokens += others
 		plain = {key: value for key, value in message.items() if key != "users"}
+		notification = message.get("notification") or {}
 		if other_tokens:
-			split.append({**plain, "tokens": other_tokens})
+			titled = {**notification, "title": with_site(notification.get("title", ""))}
+			split.append({**plain, "tokens": other_tokens, "notification": titled})
 		if app_tokens:
-			notification = message.get("notification") or {}
 			data = {
 				**(message.get("data") or {}),
 				# The relay writes its own empty title and body into the data of a push without one.
@@ -337,7 +338,7 @@ def send_reminder_push(reminder, user_id):
 				[
 					{
 						"users": [user_id],
-						"notification": {"title": with_site(title), "body": body},
+						"notification": {"title": title, "body": body},
 						"data": data,
 						# One reminder = one notification — tag by the reminder, not the
 						# channel, so it never coalesces with message notifications.
