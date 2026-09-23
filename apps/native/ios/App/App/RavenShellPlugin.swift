@@ -13,6 +13,7 @@ public class RavenShellPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "clearShareIntent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "showNotification", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "applyTheme", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "watchNotifications", returnType: CAPPluginReturnPromise),
     ]
 
     override public func load() {
@@ -69,6 +70,11 @@ public class RavenShellPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func clearShareIntent(_ call: CAPPluginCall) {
         // send-intent marks a delivered share as processed itself.
+        call.resolve()
+    }
+
+    @objc func watchNotifications(_ call: CAPPluginCall) {
+        // iOS hands every push to the page while the app is open; nothing here decides.
         call.resolve()
     }
 }

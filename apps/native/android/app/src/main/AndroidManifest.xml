@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:name=".RavenApplication"
@@ -58,6 +59,16 @@
 
         <!-- Background pushes use the same channel as RavenShell.showNotification. -->
         <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="raven_messages" />
+
+        <!-- The app's own service takes every push: one with no title reaches the app itself. -->
+        <service android:name=".RavenNotificationService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!-- RavenNotificationService extends it and keeps its behaviour; two claimants would leave
+             the winner to resolution order, and the plugin's alone drops a push with no title. -->
+        <service android:name="io.capawesome.capacitorjs.plugins.firebase.messaging.MessagingService" tools:node="remove" />
     </application>
 
     <!-- Permissions -->

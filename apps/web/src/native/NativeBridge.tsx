@@ -6,7 +6,7 @@ import { trackKeyboardInset } from "./keyboard"
 import { toast } from "sonner"
 import _ from "@lib/translate"
 import { pendingNotice, pendingPath } from "./pending"
-import { openNotificationTarget, subscribeForeignSiteNotifications, subscribeNotificationTaps } from "./push"
+import { openNotificationTarget, subscribeForeignSiteNotifications, subscribeNotificationTaps, watchNotifications } from "./push"
 import { subscribeShareDelivery } from "./shareIn"
 import type { VersionNotice } from "./SitePicker"
 
@@ -24,6 +24,10 @@ export default function NativeBridge() {
         const unKeyboard = trackKeyboardInset()
         const unTap = subscribeNotificationTaps((data) => { openNotificationTarget(data, go).catch(() => { }) })
         const unForeign = subscribeForeignSiteNotifications()
+        void watchNotifications(true)
+        // A page leaving takes its listeners with it, and this effect's cleanup does not run.
+        const onLeave = () => { void watchNotifications(false) }
+        window.addEventListener("pagehide", onLeave)
         const unShare = subscribeShareDelivery(go)
         pendingPath.take().then((path) => path && go(path))
         pendingNotice.take().then((stored) => {
@@ -32,7 +36,12 @@ export default function NativeBridge() {
             if (notice.kind === "mismatch") toast.warning(_("This site runs Raven {0}; the app is built for {1}. Some features may not work.", [notice.site, notice.app]), { duration: 8000 })
             else toast.warning(_("A newer Raven app is available for this site."), { duration: 8000 })
         }).catch(() => { })
-        return () => { disposed = true; unBack(); unLinks(); unKeyboard(); unTap(); unForeign(); unShare() }
+        return () => {
+            disposed = true
+            window.removeEventListener("pagehide", onLeave)
+            void watchNotifications(false)
+            unBack(); unLinks(); unKeyboard(); unTap(); unForeign(); unShare()
+        }
     }, [navigate])
 
     return null

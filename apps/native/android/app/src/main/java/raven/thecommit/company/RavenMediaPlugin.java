@@ -42,7 +42,8 @@ public class RavenMediaPlugin extends Plugin {
         List<File> others = new ArrayList<>();
         for (File folder : folders) {
             total += size(folder);
-            if (!kept.contains(folder.getName())) others.add(folder);
+            // Notification avatars go last of all, however old: they are small and re-read constantly.
+            if (!kept.contains(folder.getName()) && !AvatarCache.FOLDER.equals(folder.getName())) others.add(folder);
         }
         others.sort((a, b) -> Long.compare(a.lastModified(), b.lastModified()));
         for (File folder : others) {
@@ -55,6 +56,9 @@ public class RavenMediaPlugin extends Plugin {
             total -= size(folder);
             delete(folder);
         }
+        // The faces are reached only after every other cached file has been deleted.
+        File avatars = new File(media, AvatarCache.FOLDER);
+        if (total > budget) delete(avatars);
         call.resolve();
     }
 

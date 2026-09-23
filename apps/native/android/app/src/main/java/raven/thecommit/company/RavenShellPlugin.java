@@ -28,8 +28,8 @@ import java.util.Locale;
 public class RavenShellPlugin extends Plugin {
     // ---- foreground notifications --------------------------------------------------
 
-    // Android shows a push only while the app is in the background; the page re-posts
-    // a foreground push from another saved site through here.
+    // With the app open the page sees every push: it re-posts the ones for another
+    // saved site through here, and leaves this site's to the channel it is watching.
     @PluginMethod
     public void showNotification(PluginCall call) {
         // Own thread: the avatar download must not hold up the plugin thread's other calls.
@@ -37,6 +37,14 @@ public class RavenShellPlugin extends Plugin {
             ConversationNotification.post(getContext(), call.getData());
             call.resolve();
         }).start();
+    }
+
+    // Until the page says it is listening, a push is drawn here: the seconds before it loads
+    // would otherwise pass with nothing shown.
+    @PluginMethod
+    public void watchNotifications(PluginCall call) {
+        RavenApplication.setPageWatching(Boolean.TRUE.equals(call.getBoolean("watching", false)));
+        call.resolve();
     }
 
     // The canvas behind the page follows the app's own theme; launch and resume read the same mirror.

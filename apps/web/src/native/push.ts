@@ -140,8 +140,16 @@ export const getNativeDeliveredNotifications = async () => {
 
 // A foreground push is handed to the page, not shown (presentationOptions []). Re-post the ones
 // from another saved site through the shell; the open site's own messages arrive through realtime.
+/** Tells the shell the page is handling pushes, so the app's own service stands down meanwhile. */
+export const watchNotifications = async (watching: boolean) => {
+    const { plugin } = await ravenShell()
+    await plugin.watchNotifications({ watching }).catch(() => { })
+}
+
 export const subscribeForeignSiteNotifications = (): (() => void) =>
     listenNative(async () => (await messaging()).fm.addListener("notificationReceived", async ({ notification }) => {
+        // Only while the page is on screen: out of sight, Android's notification service draws this push.
+        if (document.visibilityState !== "visible") return
         const data = (notification.data ?? {}) as Record<string, string>
         const target = resolveNotificationTarget(data, siteOrigin())
         if (target?.kind !== "other-site") return
