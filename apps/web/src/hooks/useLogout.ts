@@ -103,10 +103,11 @@ export function useLogout(): { logout: () => Promise<void>; isLoggingOut: boolea
         }
 
         if (import.meta.env.VITE_NATIVE) {
-            // Native: revoke the tokens, forget the site, wipe its local data, back to the picker.
-            const [{ signOut }, { forgetSite }] = await Promise.all([import("../native/auth"), import("../native/sites")])
+            // Native: revoke the tokens, wipe the site's local data, back to the picker. The site
+            // stays saved, signed out; clearing the default keeps the picker from reopening it.
+            const [{ signOut }, { setDefaultSite }] = await Promise.all([import("../native/auth"), import("../native/sites")])
             await signOut(siteOrigin())
-            await forgetSite(siteOrigin())
+            await setDefaultSite(null)
             // Logged out as far as the beforeunload cache writer is concerned; it wipes instead of persisting.
             clearSessionUser()
             clearLocalStorage()
