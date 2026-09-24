@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@components/ui/tooltip"
 import { ArrowUpRight, ChevronLeft, Pin, Star } from "lucide-react"
 import { ChannelIcon } from "@components/common/ChannelIcon/ChannelIcon"
 import ChannelMembers from "./ChannelMembers"
+import ProjectHubButton from "@components/features/project/ProjectHubButton"
 import ChannelMenu from "./ChannelMenu"
 import { useAtomValue } from "jotai"
 import { channelDrawerAtom } from "@utils/channelAtoms"
@@ -131,6 +132,7 @@ const ChannelHeader = ({ channelID, showActions = true, onOpenChannel }: Channel
                         <TooltipContent>{_('Open channel')}</TooltipContent>
                     </Tooltip>
                 )}
+                {shouldShowActions && <ProjectHubButton channelID={channelID} />}
                 {shouldShowActions && <ChannelMembers onClick={onOpenMembers} channelID={channelID} />}
             </div>
         </div>

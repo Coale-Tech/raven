@@ -24,15 +24,23 @@ const ModelProviderSelector = () => {
 
     const hasOpenAI = ravenSettings?.enable_openai_services === 1
     const hasLocalLLM = ravenSettings?.enable_local_llm === 1
+    const hasChatGPT = ravenSettings?.enable_chatgpt_subscription === 1
+    const hasNvidia = ravenSettings?.enable_nvidia === 1
+    const hasOllama = ravenSettings?.enable_ollama_cloud === 1
 
-    if (!hasOpenAI && !hasLocalLLM) return null
+    if (!hasOpenAI && !hasLocalLLM && !hasChatGPT && !hasNvidia && !hasOllama) return null
+
+    const defaultProvider = hasOpenAI ? "OpenAI"
+        : hasLocalLLM ? "Local LLM"
+            : hasChatGPT ? "ChatGPT Subscription"
+                : hasNvidia ? "NVIDIA" : "Ollama Cloud"
 
     return (
         <FormField
             control={control}
             name="model_provider"
             rules={{ required: isAiBot ? _("Please select a model provider") : false }}
-            defaultValue={hasOpenAI ? "OpenAI" : "Local LLM"}
+            defaultValue={defaultProvider}
             render={({ field }) => (
                 <FormItem>
                     <FormLabel>
@@ -40,7 +48,7 @@ const ModelProviderSelector = () => {
                         <FormRequiredIndicator />
                     </FormLabel>
                     <FormControl>
-                        <Select value={field.value || (hasOpenAI ? "OpenAI" : "Local LLM")} onValueChange={field.onChange}>
+                        <Select value={field.value || defaultProvider} onValueChange={field.onChange}>
                             <FormControl>
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
@@ -49,6 +57,9 @@ const ModelProviderSelector = () => {
                             <SelectContent>
                                 {hasOpenAI && <SelectItem value="OpenAI">{_("OpenAI")}</SelectItem>}
                                 {hasLocalLLM && <SelectItem value="Local LLM">{_("Local LLM")}</SelectItem>}
+                                {hasChatGPT && <SelectItem value="ChatGPT Subscription">{_("ChatGPT Subscription")}</SelectItem>}
+                                {hasNvidia && <SelectItem value="NVIDIA">{_("NVIDIA")}</SelectItem>}
+                                {hasOllama && <SelectItem value="Ollama Cloud">{_("Ollama Cloud")}</SelectItem>}
                             </SelectContent>
                         </Select>
                     </FormControl>
@@ -65,6 +76,7 @@ const ModelSelector = () => {
     const { ravenSettings } = useRavenSettings()
     const isAiBot = useWatch({ control, name: "is_ai_bot" })
     const modelProvider = useWatch({ control, name: "model_provider" })
+    const isHostedProvider = modelProvider === "ChatGPT Subscription" || modelProvider === "NVIDIA" || modelProvider === "Ollama Cloud"
 
     const { data: openaiModels } = useFrappeGetCall<{ message: string[] }>(
         "raven.api.ai_features.get_openai_available_models",
@@ -80,12 +92,19 @@ const ModelSelector = () => {
         { revalidateOnFocus: false, revalidateIfStale: false }
     )
 
+    const { data: hostedModels } = useFrappeGetCall<{ message: string[] }>(
+        "raven.api.ai_features.get_provider_models",
+        { provider: modelProvider },
+        isAiBot && isHostedProvider ? ["provider_models", modelProvider] : null,
+        { revalidateOnFocus: false, revalidateIfStale: false }
+    )
+
     const localModels = localModelData?.message.models?.map((model) => model.id) || []
 
     if (!isAiBot) return null
 
-    const models: string[] = modelProvider === "Local LLM" ? localModels : openaiModels?.message || []
-    const defaultModel = modelProvider === "Local LLM" ? localModels[0] || "" : "gpt-4o"
+    const models: string[] = modelProvider === "Local LLM" ? localModels : isHostedProvider ? hostedModels?.message || [] : openaiModels?.message || []
+    const defaultModel = modelProvider === "Local LLM" ? localModels[0] || "" : isHostedProvider ? models[0] || "" : "gpt-4o"
     const validModels = models.filter((model) => model && model.trim() !== "")
 
     return (
@@ -112,7 +131,7 @@ const ModelSelector = () => {
                                     validModels.map((model) => (
                                         <SelectItem key={model} value={model}>{model}</SelectItem>
                                     ))
-                                ) : modelProvider === "Local LLM" ? (
+                                ) : modelProvider === "Local LLM" || isHostedProvider ? (
                                     <SelectItem value="no-models" disabled>{_("No models available")}</SelectItem>
                                 ) : (
                                     <SelectItem value={defaultModel}>{defaultModel}</SelectItem>
@@ -123,7 +142,9 @@ const ModelSelector = () => {
                     <FormDescription>
                         {modelProvider === "Local LLM"
                             ? _("Select a model available on your local LLM server.")
-                            : _("The model should be compatible with the OpenAI Assistants API. We recommend using models in the GPT-4 family for best results.")}
+                            : isHostedProvider
+                                ? _("Models served by {0}.", [modelProvider])
+                                : _("The model should be compatible with the OpenAI Assistants API. We recommend using models in the GPT-4 family for best results.")}
                     </FormDescription>
                     <FormMessage />
                 </FormItem>

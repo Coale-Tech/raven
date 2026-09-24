@@ -36,6 +36,30 @@ export interface RavenSettings{
 	local_llm_api_url?: string
 	/**	OpenAI Compatible API Key : Password	*/
 	openai_compatible_api_key?: string
+	/**	Enable ChatGPT Subscription : Check	*/
+	enable_chatgpt_subscription?: 0 | 1
+	/**	OpenAI OAuth Access Token : Password	*/
+	openai_oauth_access_token?: string
+	/**	OpenAI OAuth Refresh Token : Password	*/
+	openai_oauth_refresh_token?: string
+	/**	OpenAI Account ID : Data	*/
+	openai_oauth_account_id?: string
+	/**	OpenAI Account : Data	*/
+	openai_oauth_account_label?: string
+	/**	OpenAI OAuth Expires At : Int	*/
+	openai_oauth_expires_at?: number
+	/**	Enable NVIDIA : Check	*/
+	enable_nvidia?: 0 | 1
+	/**	NVIDIA API Key : Password	*/
+	nvidia_api_key?: string
+	/**	NVIDIA API URL : Data	*/
+	nvidia_api_url?: string
+	/**	Enable Ollama Cloud : Check	*/
+	enable_ollama_cloud?: 0 | 1
+	/**	Ollama Cloud API Key : Password	*/
+	ollama_api_key?: string
+	/**	Ollama Cloud API URL : Data	*/
+	ollama_api_url?: string
 	/**	Enable Google APIs : Check - Useful for extracting information from documents before sending it to agents	*/
 	enable_google_apis?: 0 | 1
 	/**	Google Processor Location : Select	*/
@@ -52,6 +76,18 @@ export interface RavenSettings{
 	company_workspace_mapping?: RavenHRCompanyWorkspace[]
 	/**	Show if a user is on leave : Check	*/
 	show_if_a_user_is_on_leave?: 0 | 1
+	/**	Enable Project Hub : Check	*/
+	enable_project_hub?: 0 | 1
+	/**	Automatically Create a Channel for each Project : Check - If checked, a channel will be created in Raven for each Project and Project Users will be synced as channel members.	*/
+	auto_create_project_channel?: 0 | 1
+	/**	Project Channel Type : Select	*/
+	project_channel_type?: "Public" | "Private"
+	/**	Project Workspace : Link - Raven Workspace	*/
+	project_workspace?: string
+	/**	Project Bot : Link - Raven Bot	*/
+	project_bot?: string
+	/**	GitHub Token : Password	*/
+	github_token?: string
 	/**	OAuth Client : Link - OAuth Client	*/
 	oauth_client?: string
 	/**	Push Notification Service : Select	*/

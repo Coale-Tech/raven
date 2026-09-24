@@ -16,11 +16,16 @@ class RavenWorkspace(Document):
 
 		can_only_join_via_invite: DF.Check
 		description: DF.SmallText | None
+		linked_project: DF.Data | None
 		logo: DF.AttachImage | None
 		only_admins_can_create_channels: DF.Check
 		type: DF.Literal["Public", "Private"]
 		workspace_name: DF.Data
 	# end: auto-generated types
+
+	def validate(self):
+		if self.linked_project and not frappe.db.exists("Project", self.linked_project):
+			frappe.throw(frappe._("Project {0} does not exist.").format(self.linked_project))
 
 	def after_insert(self):
 		if not frappe.flags.in_patch:

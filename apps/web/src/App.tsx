@@ -43,6 +43,7 @@ const Later = lazy(() => import("@pages/later/Later"))
 const MobileProfile = lazy(() => import("@pages/profile/Profile"))
 const Search = lazy(() => import("@pages/search/Search"))
 const ScheduledMessages = lazy(() => import("@pages/scheduled-messages/ScheduledMessages"))
+const ProjectHub = lazy(() => import("@pages/project/ProjectHub"))
 
 /**
  * Home ("/") redirect, evaluated at RENDER time — module-scope reads froze
@@ -98,6 +99,7 @@ const router = createBrowserRouter(
       {/* Workspace: channels and settings only; search is global at /search above */}
       <Route path=":workspaceID" element={<WorkspaceLayout />}>
         <Route index element={<WorkspaceRedirect />} />
+        <Route path="project/:projectID" element={<Suspense key="project-hub" fallback={null}><ProjectHub /></Suspense>} />
         <Route path=":id" element={<Channel />}>
           <Route path="thread/:threadID" element={<ThreadDrawerRoute />} />
         </Route>

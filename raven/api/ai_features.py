@@ -2,6 +2,7 @@ import frappe
 import openai
 
 from raven.ai.handler import get_variables_for_instructions
+from raven.ai.providers import list_models
 
 
 @frappe.whitelist(methods=["GET"])
@@ -131,3 +132,12 @@ def test_llm_configuration(
 
 	except Exception as e:
 		return {"success": False, "message": f"Connection failed: {str(e)}"}
+
+
+@frappe.whitelist()
+def get_provider_models(provider: str):
+	"""
+	API to get the selectable model ids for ChatGPT Subscription, NVIDIA, or Ollama Cloud
+	"""
+	frappe.has_permission(doctype="Raven Settings", ptype="read", throw=True)
+	return list_models(provider, frappe.get_single("Raven Settings"))

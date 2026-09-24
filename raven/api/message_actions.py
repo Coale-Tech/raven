@@ -71,6 +71,10 @@ def get_action_defaults(action_id: str, message_id: str):
 				val = message_url
 			elif field.default_value == "workspace_id":
 				val = resolve_workspace_id(message)
+			elif field.default_value == "project":
+				from raven.raven_integrations.project.utils import project_for_channel
+
+				val = project_for_channel(message.channel_id)
 			else:
 				val = message.get(field.default_value)
 			if val:

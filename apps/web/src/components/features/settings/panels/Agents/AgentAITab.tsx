@@ -25,6 +25,9 @@ const AgentAITab = () => {
 
     const hasOpenAI = ravenSettings?.enable_openai_services === 1
     const hasLocalLLM = ravenSettings?.enable_local_llm === 1
+    const hasChatGPT = ravenSettings?.enable_chatgpt_subscription === 1
+    const hasNvidia = ravenSettings?.enable_nvidia === 1
+    const hasOllama = ravenSettings?.enable_ollama_cloud === 1
 
     return (
         <div className="flex flex-col gap-4">
@@ -37,10 +40,10 @@ const AgentAITab = () => {
                 />
             )}
 
-            {isAiBot && !hasOpenAI && !hasLocalLLM ? (
+            {isAiBot && !hasOpenAI && !hasLocalLLM && !hasChatGPT && !hasNvidia && !hasOllama ? (
                 <Alert theme="red">
                     <AlertDescription>
-                        {_("No AI providers are configured. Please configure OpenAI or Local LLM in AI Settings.")}
+                        {_("No AI providers are configured. Configure one in AI Settings.")}
                     </AlertDescription>
                 </Alert>
             ) : (
@@ -88,10 +91,10 @@ const AgentAITab = () => {
                 </>
             )}
 
-            {isLocalLLM && (
+            {!isOpenAI && (
                 <Alert theme="blue">
                     <AlertDescription>
-                        {_("Currently, code interpreter features are not available for Local LLM providers. These features require OpenAI's infrastructure.")}
+                        {_("Currently, code interpreter features are not available for this provider. These features require OpenAI's infrastructure.")}
                     </AlertDescription>
                 </Alert>
             )}

@@ -22,26 +22,44 @@ class RavenSettings(Document):
 
 		auto_add_system_users: DF.Check
 		auto_create_department_channel: DF.Check
+		auto_create_project_channel: DF.Check
 		blocked_links: DF.Table[RavenBlockedLinks]
 		company_workspace_mapping: DF.Table[RavenHRCompanyWorkspace]
 		config: DF.SmallText | None
 		department_channel_type: DF.Literal["Public", "Private"]
 		enable_ai_integration: DF.Check
+		enable_chatgpt_subscription: DF.Check
 		enable_google_apis: DF.Check
 		enable_local_llm: DF.Check
+		enable_nvidia: DF.Check
+		enable_ollama_cloud: DF.Check
 		enable_openai_services: DF.Check
+		enable_project_hub: DF.Check
 		enable_quiet_hours: DF.Check
 		frappe_meet_hosted_urls: DF.SmallText | None
+		github_token: DF.Password | None
 		google_processor_location: DF.Literal["us", "eu"]
 		google_project_id: DF.Data | None
 		google_service_account_json_key: DF.Password | None
 		local_llm_api_url: DF.Data | None
 		local_llm_provider: DF.Literal["LM Studio", "Ollama", "LocalAI", "OpenAI Compatible"]
+		nvidia_api_key: DF.Password | None
+		nvidia_api_url: DF.Data | None
 		oauth_client: DF.Link | None
+		ollama_api_key: DF.Password | None
+		ollama_api_url: DF.Data | None
 		openai_api_key: DF.Password | None
 		openai_compatible_api_key: DF.Password | None
+		openai_oauth_access_token: DF.Password | None
+		openai_oauth_account_id: DF.Data | None
+		openai_oauth_account_label: DF.Data | None
+		openai_oauth_expires_at: DF.Int
+		openai_oauth_refresh_token: DF.Password | None
 		openai_organisation_id: DF.Data | None
 		openai_project_id: DF.Data | None
+		project_bot: DF.Link | None
+		project_channel_type: DF.Literal["Public", "Private"]
+		project_workspace: DF.Link | None
 		push_notification_api_key: DF.Data | None
 		push_notification_api_secret: DF.Password | None
 		push_notification_server_url: DF.Data | None
@@ -85,3 +103,12 @@ class RavenSettings(Document):
 				frappe.throw(_("Please add the Google Service Account JSON Key"))
 			if not self.google_processor_location:
 				frappe.throw(_("Please select the Google Processor Location"))
+
+		if self.enable_project_hub and "erpnext" not in frappe.get_installed_apps():
+			frappe.throw(_("Project Hub needs ERPNext installed."))
+
+	def on_update(self):
+		if self.enable_project_hub and self.has_value_changed("enable_project_hub"):
+			from raven.raven_integrations.project.setup import setup_project_hub
+
+			setup_project_hub(self)

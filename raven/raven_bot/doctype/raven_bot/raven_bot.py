@@ -43,7 +43,9 @@ class RavenBot(Document):
 		is_ai_bot: DF.Check
 		is_standard: DF.Check
 		model: DF.Data | None
-		model_provider: DF.Literal["OpenAI", "Local LLM"]
+		model_provider: DF.Literal[
+			"OpenAI", "Local LLM", "ChatGPT Subscription", "NVIDIA", "Ollama Cloud"
+		]
 		module: DF.Link | None
 		openai_assistant_id: DF.Data | None
 		openai_vector_store_id: DF.Data | None
@@ -139,7 +141,7 @@ class RavenBot(Document):
 	def create_openai_assistant(self):
 		# Create an OpenAI Assistant for the bot (legacy - being phased out for Agents SDK)
 		# Check again to ensure we're not creating for Local LLM
-		if self.model_provider == "Local LLM":
+		if self.model_provider != "OpenAI":
 			return
 
 		client = get_open_ai_client()
@@ -192,7 +194,7 @@ class RavenBot(Document):
 			return
 
 		# Don't update assistant for Local LLM bots
-		if self.model_provider == "Local LLM":
+		if self.model_provider != "OpenAI":
 			return
 
 		client = get_open_ai_client()

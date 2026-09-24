@@ -12,7 +12,8 @@
   "description",
   "column_break_svnf",
   "logo",
-  "only_admins_can_create_channels"
+  "only_admins_can_create_channels",
+  "linked_project"
  ],
  "fields": [
   {
@@ -58,6 +59,12 @@
    "fieldname": "only_admins_can_create_channels",
    "fieldtype": "Check",
    "label": "Only allow admins to create channels in the workspace"
+  },
+  {
+   "description": "Project shown in this workspace's Project Hub unless a channel overrides it.",
+   "fieldname": "linked_project",
+   "fieldtype": "Data",
+   "label": "Linked Project"
   }
  ],
  "index_web_pages_for_search": 1,

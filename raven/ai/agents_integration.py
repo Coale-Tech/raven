@@ -21,6 +21,7 @@ from agents import (
 	LocalShellTool,
 	ModelSettings,
 	OpenAIProvider,
+	RunConfig,
 	Runner,
 	Tool,
 	WebSearchTool,
@@ -28,6 +29,8 @@ from agents import (
 )
 from frappe import _
 from openai import AsyncOpenAI
+
+from raven.ai.providers import build_client
 
 from .functions import (
 	cancel_document,
@@ -52,7 +55,9 @@ class RavenAgentManager:
 
 	def _setup_client(self):
 		"""Configure OpenAI client based on provider"""
-		if self.bot_doc.model_provider == "Local LLM" and self.settings.enable_local_llm:
+		provider_name = self.bot_doc.model_provider
+
+		if provider_name == "Local LLM" and self.settings.enable_local_llm:
 			# Client for local LLM
 			if not self.settings.local_llm_api_url:
 				frappe.throw(_("Local LLM API URL is not configured in Raven Settings"))
@@ -72,6 +77,9 @@ class RavenAgentManager:
 			self.provider = OpenAIProvider(
 				openai_client=client, use_responses=False  # Force use of chat/completions endpoint
 			)
+		elif provider_name in ("ChatGPT Subscription", "NVIDIA", "Ollama Cloud"):
+			client, use_responses = build_client(provider_name, self.settings)
+			self.provider = OpenAIProvider(openai_client=client, use_responses=use_responses)
 		else:
 			# Standard OpenAI client
 			api_key = self.settings.get_password("openai_api_key")
@@ -348,8 +356,8 @@ class RavenAgentManager:
 
 	def _filter_tools_for_provider(self) -> list[Tool]:
 		"""Filter tools based on the provider capabilities"""
-		if self.bot_doc.model_provider == "Local LLM":
-			# Filter out hosted tools that are not supported with ChatCompletions API
+		# Hosted tools are OpenAI-platform only.
+		if self.bot_doc.model_provider != "OpenAI":
 			filtered_tools = []
 			hosted_tool_types = (
 				CodeInterpreterTool,
@@ -364,7 +372,7 @@ class RavenAgentManager:
 			for tool in self.tools:
 				if isinstance(tool, hosted_tool_types):
 					frappe.log_error(
-						f"Skipping hosted tool {tool.name} for Local LLM - not supported with ChatCompletions API",
+						f"Skipping hosted tool {tool.name} for {self.bot_doc.model_provider} - not supported with ChatCompletions API",
 						"Tool Filtering",
 					)
 				else:
@@ -428,12 +436,21 @@ IMPORTANT: When calling tools, the SDK will handle the tool execution automatica
 
 			instructions = instructions + tools_instruction
 
-		# Create model settings
-		model_settings = ModelSettings(temperature=self.bot_doc.temperature, top_p=self.bot_doc.top_p)
+		# Create model settings. The Codex backend (ChatGPT Subscription)
+		# rejects temperature, top_p and max_output_tokens -- it only takes
+		# a reasoning effort.
+		if self.bot_doc.model_provider == "ChatGPT Subscription":
+			from openai.types.shared import Reasoning
 
-		# Add reasoning_effort if available (for o-series models)
-		if hasattr(self.bot_doc, "reasoning_effort") and self.bot_doc.reasoning_effort:
-			model_settings.reasoning_effort = self.bot_doc.reasoning_effort
+			model_settings = ModelSettings(
+				store=False, reasoning=Reasoning(effort=self.bot_doc.reasoning_effort or "low")
+			)
+		else:
+			model_settings = ModelSettings(temperature=self.bot_doc.temperature, top_p=self.bot_doc.top_p)
+
+			# Add reasoning_effort if available (o-series reasoning models)
+			if hasattr(self.bot_doc, "reasoning_effort") and self.bot_doc.reasoning_effort:
+				model_settings.reasoning_effort = self.bot_doc.reasoning_effort
 
 		# Create agent - ALWAYS pass empty list instead of None for tools
 		# Get the model from the provider
@@ -514,9 +531,22 @@ async def handle_ai_request_async(
 			if bot.model_provider == "Local LLM":
 				raise TypeError("Force fallback for Local LLM to handle custom tool calls")
 
-			# Use Runner.run as a static method (not an instance)
-			# Set max_turns to prevent infinite loops
-			result = await Runner.run(agent, full_input, max_turns=5)
+			# Tracing exports to the OpenAI platform using the real OpenAI API
+			# key; skip it for every provider that isn't authenticated that way.
+			run_config = RunConfig(tracing_disabled=bot.model_provider != "OpenAI")
+
+			if bot.model_provider == "ChatGPT Subscription":
+				# The ChatGPT backend (chatgpt.com/backend-api/codex) only
+				# serves streaming completions; Runner.run's one-shot request
+				# 404s against it, so drain the stream server-side instead.
+				streamed = Runner.run_streamed(agent, full_input, max_turns=5, run_config=run_config)
+				async for _event in streamed.stream_events():
+					pass
+				result = streamed
+			else:
+				# Use Runner.run as a static method (not an instance)
+				# Set max_turns to prevent infinite loops
+				result = await Runner.run(agent, full_input, max_turns=5, run_config=run_config)
 
 		except (TypeError, openai.NotFoundError) as e:
 			# Handle both TypeError and NotFoundError (404) with fallback

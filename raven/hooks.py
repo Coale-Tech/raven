@@ -151,6 +151,15 @@ doc_events = {
 		"on_update": "raven.raven_integrations.controllers.employee.on_update",
 		"on_trash": "raven.raven_integrations.controllers.employee.on_trash",
 	},
+	"Project": {
+		"after_insert": "raven.raven_integrations.controllers.project.after_insert",
+		"on_update": "raven.raven_integrations.controllers.project.on_update",
+		"on_trash": "raven.raven_integrations.controllers.project.on_trash",
+	},
+	"Task": {
+		"after_insert": "raven.raven_integrations.controllers.task.after_insert",
+		"on_update": "raven.raven_integrations.controllers.task.on_update",
+	},
 }
 
 # Scheduled Tasks
@@ -175,6 +184,9 @@ scheduler_events = {
 	"daily_maintenance": [
 		"raven.scheduler.daily.sync_invalid_tokens",
 		"raven.raven_cloud_notifications.sync_users_tokens_to_raven_cloud",
+	],
+	"daily": [
+		"raven.raven_integrations.project.digest.send_overdue_digest",
 	],
 	"cron": {
 		# run every 5 minutes. Reminder and scheduled message times are aligned to this

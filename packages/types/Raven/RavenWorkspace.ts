@@ -20,4 +20,6 @@ export interface RavenWorkspace{
 	description?: string
 	/**	Logo : Attach Image	*/
 	logo?: string
+	/**	Linked Project : Data	*/
+	linked_project?: string
 }

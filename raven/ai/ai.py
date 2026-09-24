@@ -11,6 +11,7 @@ from raven.ai.openai_client import (
 	file_search_file_types,
 	get_open_ai_client,
 )
+from raven.ai.providers import AGENT_PROVIDERS
 
 
 def handle_bot_dm(message, bot):
@@ -21,7 +22,7 @@ def handle_bot_dm(message, bot):
 	"""
 
 	# Check if bot uses new Agents SDK
-	if bot.model_provider in ["OpenAI", "Local LLM"] and not bot.openai_assistant_id:
+	if bot.model_provider in AGENT_PROVIDERS and not bot.openai_assistant_id:
 		return handle_bot_dm_with_agents(message, bot)
 	else:
 		# Use old Assistants API for legacy bots
@@ -198,7 +199,7 @@ def handle_ai_thread_message(message, channel):
 	bot = frappe.get_cached_doc("Raven Bot", channel.thread_bot)
 
 	# Check if bot uses new Agents SDK
-	if bot.model_provider in ["OpenAI", "Local LLM"] and not bot.openai_assistant_id:
+	if bot.model_provider in AGENT_PROVIDERS and not bot.openai_assistant_id:
 		return handle_ai_thread_message_with_agents(message, channel, bot)
 	else:
 		# Use old Assistants API for legacy bots

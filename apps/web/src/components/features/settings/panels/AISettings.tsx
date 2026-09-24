@@ -1,13 +1,15 @@
-import { useState } from "react"
+import { useContext, useState } from "react"
 import { useFormContext, useWatch } from "react-hook-form"
-import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk"
+import { FrappeConfig, FrappeContext, useFrappeGetCall, useFrappePostCall, type FrappeError } from "frappe-react-sdk"
 import { toast } from "sonner"
 import { Separator } from "@components/ui/separator"
 import { Alert, AlertDescription } from "@components/ui/alert"
 import { Button } from "@components/ui/button"
 import { DataField, SelectFormField, SwitchFormField } from "@components/ui/form-elements"
 import { SelectItem } from "@components/ui/select"
+import { errorResponseToast } from "@components/ui/error-banner"
 import { AdminSettingsForm } from "./AdminSettingsForm"
+import ChatGPTSubscriptionLogin from "./ai/ChatGPTSubscriptionLogin"
 import type { RavenSettings } from "@raven/types/Raven/RavenSettings"
 import _ from "@lib/translate"
 
@@ -25,6 +27,9 @@ const AISettingsFields = () => {
     const localEnabled = useWatch({ control, name: "enable_local_llm" })
     const localProvider = useWatch({ control, name: "local_llm_provider" })
     const localLLMUrl = useWatch({ control, name: "local_llm_api_url" })
+    const chatgptEnabled = useWatch({ control, name: "enable_chatgpt_subscription" })
+    const nvidiaEnabled = useWatch({ control, name: "enable_nvidia" })
+    const ollamaEnabled = useWatch({ control, name: "enable_ollama_cloud" })
 
     const { data: openaiVersion } = useFrappeGetCall<{ message: string }>(
         "raven.api.ai_features.get_open_ai_version",
@@ -37,6 +42,22 @@ const AISettingsFields = () => {
     }>("raven.api.ai_features.test_llm_configuration")
 
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+
+    const { call } = useContext(FrappeContext) as FrappeConfig
+    const [testingProvider, setTestingProvider] = useState<"NVIDIA" | "Ollama Cloud" | null>(null)
+
+    const handleTestProvider = async (provider: "NVIDIA" | "Ollama Cloud") => {
+        setTestingProvider(provider)
+        try {
+            const res = await call.get("raven.api.ai_features.get_provider_models", { provider })
+            const models = (res.message as string[]) || []
+            toast.success(_("Found {0} models.", [String(models.length)]))
+        } catch (error) {
+            errorResponseToast(_("Could not connect to {0}", [provider]), error as FrappeError)
+        } finally {
+            setTestingProvider(null)
+        }
+    }
 
     const handleTestConnection = async () => {
         try {
@@ -163,6 +184,96 @@ const AISettingsFields = () => {
                                     {!localProvider && _("Select a provider to see specific instructions.")}
                                 </AlertDescription>
                             </Alert>
+                        </div>
+                    ) : null}
+
+                    <Separator />
+
+                    {/* ChatGPT Subscription */}
+                    <SwitchFormField
+                        name="enable_chatgpt_subscription"
+                        label={_("Enable ChatGPT Subscription")}
+                        formDescription={_("Use your ChatGPT Plus/Pro subscription instead of API billing.")}
+                    />
+                    {chatgptEnabled ? (
+                        <div className="flex flex-col gap-4 pl-1">
+                            <ChatGPTSubscriptionLogin />
+                        </div>
+                    ) : null}
+
+                    <Separator />
+
+                    {/* NVIDIA */}
+                    <SwitchFormField
+                        name="enable_nvidia"
+                        label={_("Enable NVIDIA")}
+                        formDescription={_("Use models served by NVIDIA's OpenAI-compatible API.")}
+                    />
+                    {nvidiaEnabled ? (
+                        <div className="flex flex-col gap-4 pl-1">
+                            <DataField
+                                name="nvidia_api_key"
+                                label={_("NVIDIA API Key")}
+                                isRequired
+                                rules={{ required: _("Please add your NVIDIA API Key") }}
+                                inputProps={{ type: "password", placeholder: "••••••••••••••••••••", autoComplete: "off" }}
+                            />
+                            <div className="flex items-end gap-2">
+                                <div className="flex-1">
+                                    <DataField
+                                        name="nvidia_api_url"
+                                        label={_("API URL")}
+                                        inputProps={{ placeholder: "https://integrate.api.nvidia.com/v1", autoComplete: "off" }}
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleTestProvider("NVIDIA")}
+                                    disabled={testingProvider === "NVIDIA"}
+                                >
+                                    {_("Test Connection")}
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    <Separator />
+
+                    {/* Ollama Cloud */}
+                    <SwitchFormField
+                        name="enable_ollama_cloud"
+                        label={_("Enable Ollama Cloud")}
+                        formDescription={_("Use models served by Ollama Cloud.")}
+                    />
+                    {ollamaEnabled ? (
+                        <div className="flex flex-col gap-4 pl-1">
+                            <DataField
+                                name="ollama_api_key"
+                                label={_("Ollama Cloud API Key")}
+                                isRequired
+                                rules={{ required: _("Please add your Ollama Cloud API Key") }}
+                                inputProps={{ type: "password", placeholder: "••••••••••••••••••••", autoComplete: "off" }}
+                            />
+                            <div className="flex items-end gap-2">
+                                <div className="flex-1">
+                                    <DataField
+                                        name="ollama_api_url"
+                                        label={_("API URL")}
+                                        inputProps={{ placeholder: "https://ollama.com", autoComplete: "off" }}
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleTestProvider("Ollama Cloud")}
+                                    disabled={testingProvider === "Ollama Cloud"}
+                                >
+                                    {_("Test Connection")}
+                                </Button>
+                            </div>
                         </div>
                     ) : null}
                 </>

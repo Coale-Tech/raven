@@ -1,0 +1,86 @@
+import frappe
+from frappe import _
+
+from raven.raven_integrations.project.utils import channel_for_project, project_for_channel
+
+ALLOWED_PROJECT_FIELDS = frozenset(
+	{"status", "expected_start_date", "expected_end_date", "customer", "raven_github_repo"}
+)
+
+
+@frappe.whitelist()
+def get_project_for_channel(channel_id: str) -> str | None:
+	frappe.has_permission("Raven Channel", "read", channel_id, throw=True)
+
+	project = project_for_channel(channel_id)
+	if project and frappe.has_permission("Project", "read", project):
+		return project
+	return None
+
+
+@frappe.whitelist(methods=["POST"])
+def link_project(project: str, channel_id: str | None = None, workspace: str | None = None) -> None:
+	if bool(channel_id) == bool(workspace):
+		frappe.throw(_("Provide exactly one of channel_id or workspace"))
+
+	frappe.has_permission("Project", "read", project, throw=True)
+
+	if channel_id:
+		frappe.has_permission("Raven Channel", "write", channel_id, throw=True)
+		frappe.db.set_value(
+			"Raven Channel", channel_id, {"linked_doctype": "Project", "linked_document": project}
+		)
+	else:
+		frappe.has_permission("Raven Workspace", "write", workspace, throw=True)
+		doc = frappe.get_doc("Raven Workspace", workspace)
+		doc.linked_project = project
+		doc.save()
+
+
+@frappe.whitelist(methods=["POST"])
+def unlink_project(channel_id: str | None = None, workspace: str | None = None) -> None:
+	if bool(channel_id) == bool(workspace):
+		frappe.throw(_("Provide exactly one of channel_id or workspace"))
+
+	if channel_id:
+		frappe.has_permission("Raven Channel", "write", channel_id, throw=True)
+		frappe.db.set_value("Raven Channel", channel_id, {"linked_doctype": None, "linked_document": None})
+	else:
+		frappe.has_permission("Raven Workspace", "write", workspace, throw=True)
+		frappe.db.set_value("Raven Workspace", workspace, "linked_project", None)
+
+
+@frappe.whitelist()
+def get_project_summary(project: str) -> dict:
+	doc = frappe.get_doc("Project", project)
+	doc.check_permission("read")
+
+	summary = {
+		field: doc.get(field)
+		for field in (
+			"name",
+			"project_name",
+			"status",
+			"percent_complete",
+			"expected_start_date",
+			"expected_end_date",
+			"customer",
+			"company",
+			"raven_github_repo",
+		)
+	}
+	summary["users"] = [row.user for row in doc.users]
+	summary["channel"] = channel_for_project(doc.name)
+	return summary
+
+
+@frappe.whitelist(methods=["POST"])
+def set_project_field(project: str, fieldname: str, value: str | None) -> str | None:
+	if fieldname not in ALLOWED_PROJECT_FIELDS:
+		frappe.throw(_("Field {0} is not editable here").format(fieldname))
+
+	doc = frappe.get_doc("Project", project)
+	doc.check_permission("write")
+	doc.set(fieldname, value or None)
+	doc.save()
+	return doc.get(fieldname)

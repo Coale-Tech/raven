@@ -16,8 +16,12 @@ export const AINotEnabledCallout = () => {
     const isAIEnabled = ravenSettings?.enable_ai_integration === 1
     const hasOpenAI = ravenSettings?.enable_openai_services === 1
     const hasLocalLLM = ravenSettings?.enable_local_llm === 1
+    const hasChatGPT = ravenSettings?.enable_chatgpt_subscription === 1
+    const hasNvidia = ravenSettings?.enable_nvidia === 1
+    const hasOllama = ravenSettings?.enable_ollama_cloud === 1
+    const hasAnyProvider = hasOpenAI || hasLocalLLM || hasChatGPT || hasNvidia || hasOllama
 
-    if (isAIEnabled && (hasOpenAI || hasLocalLLM)) {
+    if (isAIEnabled && hasAnyProvider) {
         return null
     }
 

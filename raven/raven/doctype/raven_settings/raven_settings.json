@@ -29,6 +29,21 @@
   "local_llm_provider",
   "local_llm_api_url",
   "openai_compatible_api_key",
+  "chatgpt_subscription_section",
+  "enable_chatgpt_subscription",
+  "openai_oauth_access_token",
+  "openai_oauth_refresh_token",
+  "openai_oauth_account_id",
+  "openai_oauth_account_label",
+  "openai_oauth_expires_at",
+  "nvidia_section",
+  "enable_nvidia",
+  "nvidia_api_key",
+  "nvidia_api_url",
+  "ollama_cloud_section",
+  "enable_ollama_cloud",
+  "ollama_api_key",
+  "ollama_api_url",
   "google_vision_and_document_ai_section",
   "enable_google_apis",
   "google_processor_location",
@@ -40,6 +55,13 @@
   "company_workspace_mapping",
   "attendance_and_leaves_section",
   "show_if_a_user_is_on_leave",
+  "projects_tab",
+  "enable_project_hub",
+  "auto_create_project_channel",
+  "project_channel_type",
+  "project_workspace",
+  "project_bot",
+  "github_token",
   "raven_mobile_tab",
   "oauth_client",
   "push_notifications_tab",
@@ -115,6 +137,55 @@
    "label": "Show if a user is on leave"
   },
   {
+   "fieldname": "projects_tab",
+   "fieldtype": "Tab Break",
+   "label": "Projects"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_project_hub",
+   "fieldtype": "Check",
+   "label": "Enable Project Hub"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_project_hub",
+   "description": "If checked, a channel will be created in Raven for each Project and Project Users will be synced as channel members.",
+   "fieldname": "auto_create_project_channel",
+   "fieldtype": "Check",
+   "label": "Automatically Create a Channel for each Project"
+  },
+  {
+   "default": "Private",
+   "depends_on": "eval:doc.auto_create_project_channel",
+   "fieldname": "project_channel_type",
+   "fieldtype": "Select",
+   "label": "Project Channel Type",
+   "options": "Public\nPrivate"
+  },
+  {
+   "depends_on": "eval:doc.auto_create_project_channel",
+   "fieldname": "project_workspace",
+   "fieldtype": "Link",
+   "label": "Project Workspace",
+   "mandatory_depends_on": "eval:doc.auto_create_project_channel",
+   "options": "Raven Workspace"
+  },
+  {
+   "fieldname": "project_bot",
+   "fieldtype": "Link",
+   "label": "Project Bot",
+   "options": "Raven Bot",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.enable_project_hub",
+   "description": "Fine-grained token with read access to Contents and Metadata.",
+   "fieldname": "github_token",
+   "fieldtype": "Password",
+   "label": "GitHub Token"
+  },
+  {
    "fieldname": "ai_section",
    "fieldtype": "Section Break",
    "label": "AI"
@@ -183,6 +254,98 @@
    "fieldname": "openai_compatible_api_key",
    "fieldtype": "Password",
    "label": "OpenAI Compatible API Key"
+  },
+  {
+   "fieldname": "chatgpt_subscription_section",
+   "fieldtype": "Section Break",
+   "label": "ChatGPT Subscription"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_ai_integration",
+   "fieldname": "enable_chatgpt_subscription",
+   "fieldtype": "Check",
+   "label": "Enable ChatGPT Subscription"
+  },
+  {
+   "fieldname": "openai_oauth_access_token",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "OpenAI OAuth Access Token"
+  },
+  {
+   "fieldname": "openai_oauth_refresh_token",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "OpenAI OAuth Refresh Token"
+  },
+  {
+   "fieldname": "openai_oauth_account_id",
+   "fieldtype": "Data",
+   "label": "OpenAI Account ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "openai_oauth_account_label",
+   "fieldtype": "Data",
+   "label": "OpenAI Account",
+   "read_only": 1
+  },
+  {
+   "fieldname": "openai_oauth_expires_at",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "OpenAI OAuth Expires At"
+  },
+  {
+   "fieldname": "nvidia_section",
+   "fieldtype": "Section Break",
+   "label": "NVIDIA"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_ai_integration",
+   "fieldname": "enable_nvidia",
+   "fieldtype": "Check",
+   "label": "Enable NVIDIA"
+  },
+  {
+   "depends_on": "eval:doc.enable_nvidia",
+   "fieldname": "nvidia_api_key",
+   "fieldtype": "Password",
+   "label": "NVIDIA API Key"
+  },
+  {
+   "default": "https://integrate.api.nvidia.com/v1",
+   "depends_on": "eval:doc.enable_nvidia",
+   "fieldname": "nvidia_api_url",
+   "fieldtype": "Data",
+   "label": "NVIDIA API URL"
+  },
+  {
+   "fieldname": "ollama_cloud_section",
+   "fieldtype": "Section Break",
+   "label": "Ollama Cloud"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_ai_integration",
+   "fieldname": "enable_ollama_cloud",
+   "fieldtype": "Check",
+   "label": "Enable Ollama Cloud"
+  },
+  {
+   "depends_on": "eval:doc.enable_ollama_cloud",
+   "fieldname": "ollama_api_key",
+   "fieldtype": "Password",
+   "label": "Ollama Cloud API Key"
+  },
+  {
+   "default": "https://ollama.com",
+   "depends_on": "eval:doc.enable_ollama_cloud",
+   "fieldname": "ollama_api_url",
+   "fieldtype": "Data",
+   "label": "Ollama Cloud API URL"
   },
   {
    "fieldname": "raven_mobile_tab",

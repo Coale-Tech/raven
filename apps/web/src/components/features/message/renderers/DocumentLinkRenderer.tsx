@@ -164,7 +164,7 @@ const sanitizeServerHtml = (html: string): string => {
 }
 
 /** Sanitize-then-parse: entities decode, benign markup renders, nothing executes. */
-const ServerHtml = ({ html, className }: { html: string; className?: string }) => {
+export const ServerHtml = ({ html, className }: { html: string; className?: string }) => {
     const nodes = useMemo(() => parse(sanitizeServerHtml(html)), [html])
     return <span className={className}>{nodes}</span>
 }

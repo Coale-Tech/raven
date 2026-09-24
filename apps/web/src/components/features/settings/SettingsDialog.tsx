@@ -6,7 +6,7 @@ import { SettingsDialog, SettingsPanel, SettingsPanelContent, SettingsPanelDescr
 import { Spinner } from '@components/ui/spinner';
 import _ from '@lib/translate'
 import { useAtom } from 'jotai'
-import { BellDotIcon, BellRingIcon, BotIcon, BrainCogIcon, Building2Icon, CalendarSyncIcon, CpuIcon, FileTextIcon, FolderIcon, FunctionSquareIcon, IdCardIcon, InfoIcon, KeyboardIcon, PaletteIcon, PanelLeftIcon, SlidersHorizontalIcon, SmilePlusIcon, UserIcon, UsersIcon, WebhookIcon, ZapIcon } from 'lucide-react'
+import { BellDotIcon, BellRingIcon, BotIcon, BrainCogIcon, Building2Icon, CalendarSyncIcon, CpuIcon, FileTextIcon, FolderIcon, FolderKanbanIcon, FunctionSquareIcon, IdCardIcon, InfoIcon, KeyboardIcon, PaletteIcon, PanelLeftIcon, SlidersHorizontalIcon, SmilePlusIcon, UserIcon, UsersIcon, WebhookIcon, ZapIcon } from 'lucide-react'
 import { useHotkeys } from 'react-hotkeys-hook';
 import useCurrentRavenUser from '@raven/lib/hooks/useCurrentRavenUser';
 import { UserAvatar } from '../message/UserAvatar';
@@ -26,6 +26,7 @@ const CustomizeSidebarPanel = lazy(() =>
 const About = lazy(() => import('./panels/About').then((m) => ({ default: m.About })));
 const AISettingsPanel = lazy(() => import('./panels/AISettings').then((m) => ({ default: m.AISettings })));
 const FrappeHRPanel = lazy(() => import('./panels/FrappeHR').then((m) => ({ default: m.FrappeHR })));
+const ProjectHubPanel = lazy(() => import('./panels/ProjectHub').then((m) => ({ default: m.ProjectHub })));
 const NotificationsPanel = lazy(() => import('./panels/PushNotifications').then((m) => ({ default: m.PushNotifications })));
 const UsersPanel = lazy(() => import('./panels/Users/Users').then((m) => ({ default: m.Users })));
 const WorkspacesPanel = lazy(() => import('./panels/Workspaces/Workspaces').then((m) => ({ default: m.Workspaces })));
@@ -190,6 +191,14 @@ const SETTINGS_TABS: {
             icon: WebhookIcon,
             component: WebhooksPanel,
             description: _("Fire webhooks on specific events like when a message is sent or channel is created."),
+        },
+        {
+            id: "project-hub",
+            group: "integrations",
+            label: _("Project Hub"),
+            icon: FolderKanbanIcon,
+            component: ProjectHubPanel,
+            description: _("Manage ERPNext Projects and Tasks from inside Raven."),
         },
         {
             id: "agents",
