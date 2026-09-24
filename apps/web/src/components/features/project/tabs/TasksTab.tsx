@@ -1,16 +1,15 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, type DragEvent } from "react"
 import { useFrappeGetCall, useFrappePostCall, type FrappeError } from "frappe-react-sdk"
-import type { ColumnDef } from "@tanstack/react-table"
-import { ListChecksIcon, PlusIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@components/ui/empty"
 import ErrorBanner, { errorResponseToast } from "@components/ui/error-banner"
 import { Input } from "@components/ui/input"
-import { ListView, type ListViewColumnMeta } from "@components/ui/list-view"
+import { Progress } from "@components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select"
 import { Spinner } from "@components/ui/spinner"
 import { formatDate } from "@lib/date"
+import { cn } from "@lib/utils"
 import _ from "@lib/translate"
 
 type ProjectTask = {
@@ -36,7 +35,17 @@ const STATUS_THEME: Record<string, "gray" | "blue" | "green" | "amber" | "red"> 
     Cancelled: "red",
 }
 
-/** Project Hub → Tasks: list of the Project's Tasks with inline status editing, plus a quick-add row. */
+// Saturated "solid" step of each status's theme, for the small column-header dot —
+// same token family as Badge's solid variant (badge.tsx), gray's exception included.
+const DOT_THEME: Record<string, string> = {
+    Open: "bg-surface-gray-10",
+    Working: "bg-surface-blue-7",
+    "Pending Review": "bg-surface-amber-7",
+    Completed: "bg-surface-green-7",
+    Cancelled: "bg-surface-red-7",
+}
+
+/** Project Hub → Tasks: a status-column Kanban board with drag-and-drop, plus a quick-add row. */
 export default function TasksTab({ project }: { project: string }) {
     const { data, error, mutate } = useFrappeGetCall<{ message: ProjectTask[] }>(
         "raven.api.project_tabs.get_tasks",
@@ -57,6 +66,7 @@ export default function TasksTab({ project }: { project: string }) {
     const [subject, setSubject] = useState("")
     const [priority, setPriority] = useState<string>("Medium")
     const [dueDate, setDueDate] = useState("")
+    const [dragOverStatus, setDragOverStatus] = useState<string | null>(null)
 
     const addTask = () => {
         if (!subject.trim()) return
@@ -70,70 +80,21 @@ export default function TasksTab({ project }: { project: string }) {
             .catch((e: FrappeError) => errorResponseToast(_("Could not create task"), e))
     }
 
-    const columns = useMemo<ColumnDef<ProjectTask>[]>(
-        () => [
-            {
-                id: "subject",
-                accessorKey: "subject",
-                header: _("Task"),
-                meta: { gridWidth: "minmax(0,2fr)" } satisfies ListViewColumnMeta,
-                cell: ({ row }) => (
-                    <a
-                        href={`/app/task/${encodeURIComponent(row.original.name)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="truncate font-medium text-ink-gray-9 hover:underline"
-                    >
-                        {row.original.subject}
-                    </a>
-                ),
-            },
-            {
-                id: "priority",
-                accessorKey: "priority",
-                header: _("Priority"),
-                meta: { gridWidth: "minmax(0,0.7fr)" } satisfies ListViewColumnMeta,
-                cell: ({ row }) => <Badge variant="subtle">{_(row.original.priority)}</Badge>,
-            },
-            {
-                id: "exp_end_date",
-                accessorKey: "exp_end_date",
-                header: _("Due"),
-                meta: { gridWidth: "minmax(0,0.9fr)", tabularNums: true } satisfies ListViewColumnMeta,
-                cell: ({ row }) => (
-                    <span className="text-ink-gray-6">
-                        {row.original.exp_end_date ? formatDate(row.original.exp_end_date) : "—"}
-                    </span>
-                ),
-            },
-            {
-                id: "status",
-                accessorKey: "status",
-                header: _("Status"),
-                meta: { gridWidth: "minmax(0,1fr)", truncate: false } satisfies ListViewColumnMeta,
-                cell: ({ row }) => (
-                    <Select value={row.original.status} onValueChange={(v) => onStatusChange(row.original.name, v)}>
-                        <SelectTrigger inputSize="sm" className="h-7 w-full">
-                            <SelectValue>
-                                <Badge variant="subtle" theme={STATUS_THEME[row.original.status] ?? "gray"}>
-                                    {_(row.original.status)}
-                                </Badge>
-                            </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                            {STATUS_OPTIONS.map((s) => (
-                                <SelectItem key={s} value={s}>
-                                    {_(s)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                ),
-            },
-        ],
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [mutate],
-    )
+    const columns = useMemo(() => {
+        const byStatus: Record<string, ProjectTask[]> = Object.fromEntries(STATUS_OPTIONS.map((s) => [s, []]))
+        for (const task of tasks) {
+            const column = byStatus[task.status] ?? byStatus.Open
+            column.push(task)
+        }
+        return byStatus
+    }, [tasks])
+
+    const handleDrop = (status: string) => (e: DragEvent<HTMLDivElement>) => {
+        e.preventDefault()
+        setDragOverStatus(null)
+        const taskName = e.dataTransfer.getData("text/plain")
+        if (taskName) onStatusChange(taskName, status)
+    }
 
     if (!data && !error) {
         return (
@@ -145,21 +106,80 @@ export default function TasksTab({ project }: { project: string }) {
     if (error) return <ErrorBanner error={error} />
 
     return (
-        <div className="flex flex-col gap-4">
-            {tasks.length === 0 ? (
-                <Empty>
-                    <EmptyHeader>
-                        <EmptyMedia>
-                            <ListChecksIcon />
-                        </EmptyMedia>
-                        <EmptyTitle>{_("No tasks yet")}</EmptyTitle>
-                        <EmptyDescription>{_("Add a task below to get started.")}</EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
-            ) : (
-                <ListView data={tasks} columns={columns} getRowId={(row) => row.name} maxHeight="100%" rowHeight={44} />
-            )}
-            <div className="flex items-end gap-2 border-t border-outline-gray-2 pt-4">
+        <div className="flex flex-1 min-h-0 flex-col gap-4">
+            <div className="flex flex-1 min-h-0 gap-3 overflow-x-auto pb-1">
+                {STATUS_OPTIONS.map((status) => {
+                    const columnTasks = columns[status] ?? []
+                    return (
+                        <div
+                            key={status}
+                            onDragOver={(e) => {
+                                e.preventDefault()
+                                setDragOverStatus(status)
+                            }}
+                            onDragLeave={() => setDragOverStatus((s) => (s === status ? null : s))}
+                            onDrop={handleDrop(status)}
+                            className={cn(
+                                "flex w-72 shrink-0 flex-col rounded-lg border bg-surface-gray-1",
+                                dragOverStatus === status ? "border-outline-gray-4" : "border-outline-gray-2",
+                            )}
+                        >
+                            <div className="flex shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3 py-2">
+                                <span className={cn("size-2 shrink-0 rounded-full", DOT_THEME[status])} />
+                                <span className="text-sm font-medium text-ink-gray-8">{_(status)}</span>
+                                <Badge variant="subtle" className="ml-auto">
+                                    {columnTasks.length}
+                                </Badge>
+                            </div>
+                            <div className="flex flex-1 min-h-0 flex-col gap-2 overflow-y-auto p-2">
+                                {columnTasks.map((task) => (
+                                    <div
+                                        key={task.name}
+                                        draggable
+                                        onDragStart={(e) => e.dataTransfer.setData("text/plain", task.name)}
+                                        className="flex cursor-grab flex-col gap-2 rounded-md border border-outline-gray-2 bg-surface-base p-2.5 shadow-xs active:cursor-grabbing"
+                                    >
+                                        <a
+                                            href={`/app/task/${encodeURIComponent(task.name)}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="line-clamp-2 text-sm font-medium text-ink-gray-9 hover:underline"
+                                        >
+                                            {task.subject}
+                                        </a>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="subtle">{_(task.priority)}</Badge>
+                                            {task.exp_end_date && (
+                                                <span className="text-xs text-ink-gray-6 tabular-nums">
+                                                    {formatDate(task.exp_end_date)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {task.progress > 0 && <Progress value={task.progress} size="sm" />}
+                                        <Select value={task.status} onValueChange={(v) => onStatusChange(task.name, v)}>
+                                            <SelectTrigger inputSize="sm" className="h-7 w-full">
+                                                <SelectValue>
+                                                    <Badge variant="subtle" theme={STATUS_THEME[task.status] ?? "gray"}>
+                                                        {_(task.status)}
+                                                    </Badge>
+                                                </SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {STATUS_OPTIONS.map((s) => (
+                                                    <SelectItem key={s} value={s}>
+                                                        {_(s)}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+            <div className="flex shrink-0 items-end gap-2 border-t border-outline-gray-2 pt-4">
                 <Input
                     placeholder={_("Task subject")}
                     value={subject}
