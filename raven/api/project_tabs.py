@@ -38,17 +38,21 @@ def create_task(
 	project: str,
 	subject: str,
 	priority: str = "Medium",
+	status: str = "Open",
 	exp_end_date: str | None = None,
 	description: str | None = None,
 ) -> str:
 	_check(project)
 	frappe.has_permission("Task", "create", throw=True)
+	if status not in TASK_STATUSES:
+		frappe.throw(_("Invalid status {0}").format(status))
 	doc = frappe.get_doc(
 		{
 			"doctype": "Task",
 			"project": project,
 			"subject": subject,
 			"priority": priority,
+			"status": status,
 			"exp_end_date": exp_end_date,
 			"description": description,
 		}

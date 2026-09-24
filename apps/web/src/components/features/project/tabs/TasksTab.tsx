@@ -4,13 +4,13 @@ import { PlusIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
 import ErrorBanner, { errorResponseToast } from "@components/ui/error-banner"
-import { Input } from "@components/ui/input"
 import { Progress } from "@components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select"
 import { Spinner } from "@components/ui/spinner"
 import { formatDate } from "@lib/date"
 import { cn } from "@lib/utils"
 import _ from "@lib/translate"
+import CreateTaskDialog from "./CreateTaskDialog"
 
 type ProjectTask = {
     name: string
@@ -25,7 +25,6 @@ type ProjectTask = {
 }
 
 const STATUS_OPTIONS = ["Open", "Working", "Pending Review", "Completed", "Cancelled"] as const
-const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Urgent"] as const
 
 const STATUS_THEME: Record<string, "gray" | "blue" | "green" | "amber" | "red"> = {
     Open: "gray",
@@ -45,7 +44,7 @@ const DOT_THEME: Record<string, string> = {
     Cancelled: "bg-surface-red-7",
 }
 
-/** Project Hub → Tasks: a status-column Kanban board with drag-and-drop, plus a quick-add row. */
+/** Project Hub → Tasks: a status-column Kanban board with drag-and-drop and a per-column add-task dialog. */
 export default function TasksTab({ project }: { project: string }) {
     const { data, error, mutate } = useFrappeGetCall<{ message: ProjectTask[] }>(
         "raven.api.project_tabs.get_tasks",
@@ -60,25 +59,8 @@ export default function TasksTab({ project }: { project: string }) {
             .then(() => mutate())
             .catch((e: FrappeError) => errorResponseToast(_("Could not update status"), e))
 
-    const { call: createTask, loading: creating } = useFrappePostCall<{ message: string }>(
-        "raven.api.project_tabs.create_task",
-    )
-    const [subject, setSubject] = useState("")
-    const [priority, setPriority] = useState<string>("Medium")
-    const [dueDate, setDueDate] = useState("")
+    const [addTaskStatus, setAddTaskStatus] = useState<string | null>(null)
     const [dragOverStatus, setDragOverStatus] = useState<string | null>(null)
-
-    const addTask = () => {
-        if (!subject.trim()) return
-        createTask({ project, subject: subject.trim(), priority, exp_end_date: dueDate || undefined })
-            .then(() => {
-                setSubject("")
-                setPriority("Medium")
-                setDueDate("")
-                mutate()
-            })
-            .catch((e: FrappeError) => errorResponseToast(_("Could not create task"), e))
-    }
 
     const columns = useMemo(() => {
         const byStatus: Record<string, ProjectTask[]> = Object.fromEntries(STATUS_OPTIONS.map((s) => [s, []]))
@@ -130,6 +112,15 @@ export default function TasksTab({ project }: { project: string }) {
                                 <Badge variant="subtle" className="ml-auto">
                                     {columnTasks.length}
                                 </Badge>
+                                <Button
+                                    variant="ghost"
+                                    isIconButton
+                                    size="sm"
+                                    aria-label={_("Add task")}
+                                    onClick={() => setAddTaskStatus(status)}
+                                >
+                                    <PlusIcon />
+                                </Button>
                             </div>
                             <div className="flex flex-1 min-h-0 flex-col gap-2 overflow-y-auto p-2">
                                 {columnTasks.map((task) => (
@@ -179,32 +170,15 @@ export default function TasksTab({ project }: { project: string }) {
                     )
                 })}
             </div>
-            <div className="flex shrink-0 items-end gap-2 border-t border-outline-gray-2 pt-4">
-                <Input
-                    placeholder={_("Task subject")}
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addTask()}
-                    className="flex-1"
+            {addTaskStatus && (
+                <CreateTaskDialog
+                    project={project}
+                    status={addTaskStatus}
+                    open
+                    onOpenChange={(open) => !open && setAddTaskStatus(null)}
+                    onCreated={mutate}
                 />
-                <Select value={priority} onValueChange={setPriority}>
-                    <SelectTrigger inputSize="md" className="w-32">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {PRIORITY_OPTIONS.map((p) => (
-                            <SelectItem key={p} value={p}>
-                                {_(p)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-48" />
-                <Button onClick={addTask} loading={creating} disabled={!subject.trim()}>
-                    <PlusIcon />
-                    {_("Add Task")}
-                </Button>
-            </div>
+            )}
         </div>
     )
 }
