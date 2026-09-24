@@ -1,5 +1,7 @@
+import { useMemo } from "react"
 import { useFrappeGetCall } from "frappe-react-sdk"
 import { useNavigate } from "react-router-dom"
+import type { ColumnDef } from "@tanstack/react-table"
 import { FolderKanban } from "lucide-react"
 import { PageHeader } from "@components/layout/PageHeader"
 import AppMobileFooter from "@components/features/header/AppMobileFooter"
@@ -8,6 +10,7 @@ import { Progress } from "@components/ui/progress"
 import { Skeleton } from "@components/ui/skeleton"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@components/ui/empty"
 import ErrorBanner from "@components/ui/error-banner"
+import { ListView, type ListViewColumnMeta } from "@components/ui/list-view"
 import { useWorkspaces } from "@hooks/useWorkspaces"
 import _ from "@lib/translate"
 
@@ -44,6 +47,16 @@ const Projects = () => {
     )
     const projects = data?.message ?? []
 
+    const stats = useMemo(
+        () => [
+            { label: _("Total"), value: projects.length },
+            { label: _("Open"), value: projects.filter((p) => p.status === "Open").length },
+            { label: _("Completed"), value: projects.filter((p) => p.status === "Completed").length },
+            { label: _("Cancelled"), value: projects.filter((p) => p.status === "Cancelled").length },
+        ],
+        [projects],
+    )
+
     const openProject = (project: ProjectRow) => {
         const workspace = project.workspace || fallbackWorkspace
         if (!workspace) return
@@ -51,10 +64,48 @@ const Projects = () => {
         navigate(`/${workspace}/project/${encodeURIComponent(project.name)}${query}`)
     }
 
+    const columns = useMemo<ColumnDef<ProjectRow>[]>(
+        () => [
+            {
+                id: "project_name",
+                accessorKey: "project_name",
+                header: _("Project"),
+                meta: { gridWidth: "minmax(0,2fr)" } satisfies ListViewColumnMeta,
+                cell: ({ row }) => (
+                    <span className="truncate font-medium text-ink-gray-9">{row.original.project_name}</span>
+                ),
+            },
+            {
+                id: "status",
+                accessorKey: "status",
+                header: _("Status"),
+                meta: { gridWidth: "minmax(0,0.8fr)" } satisfies ListViewColumnMeta,
+                cell: ({ row }) => (
+                    <Badge theme={statusTheme(row.original.status)}>{_(row.original.status)}</Badge>
+                ),
+            },
+            {
+                id: "percent_complete",
+                accessorKey: "percent_complete",
+                header: _("Progress"),
+                meta: { gridWidth: "minmax(0,1.4fr)" } satisfies ListViewColumnMeta,
+                cell: ({ row }) => (
+                    <div className="flex w-full items-center gap-2">
+                        <Progress value={row.original.percent_complete} className="flex-1" />
+                        <span className="text-sm text-ink-gray-6 tabular-nums">
+                            {Math.round(row.original.percent_complete || 0)}%
+                        </span>
+                    </div>
+                ),
+            },
+        ],
+        [],
+    )
+
     return (
         <div className="flex flex-col h-dvh overflow-hidden">
             <PageHeader title={_("Projects")} />
-            <div className="flex-1 min-h-0 overflow-y-auto p-3">
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-4">
                 {error ? (
                     <ErrorBanner error={error} overrideHeading={_("Could not load projects")} />
                 ) : isLoading ? (
@@ -72,25 +123,25 @@ const Projects = () => {
                         </EmptyHeader>
                     </Empty>
                 ) : (
-                    <div className="flex flex-col gap-2">
-                        {projects.map((project) => (
-                            <button
-                                key={project.name}
-                                type="button"
-                                onClick={() => openProject(project)}
-                                className="flex flex-col gap-2 rounded-lg border border-outline-gray-2 p-3 text-start hover:bg-surface-gray-2"
-                            >
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="text-base-medium text-ink-gray-9 truncate">{project.project_name}</span>
-                                    <Badge theme={statusTheme(project.status)}>{_(project.status)}</Badge>
+                    <>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {stats.map((stat) => (
+                                <div key={stat.label} className="rounded-md border border-outline-gray-2 p-3">
+                                    <div className="text-xs text-ink-gray-5">{stat.label}</div>
+                                    <div className="mt-1 text-lg-medium text-ink-gray-9 tabular-nums">{stat.value}</div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Progress value={project.percent_complete} className="flex-1" />
-                                    <span className="text-sm text-ink-gray-6">{Math.round(project.percent_complete || 0)}%</span>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                        <ListView
+                            data={projects}
+                            columns={columns}
+                            getRowId={(row) => row.name}
+                            onRowClick={(row) => openProject(row)}
+                            maxHeight="100%"
+                            rowHeight={48}
+                            className="flex-1 min-h-0"
+                        />
+                    </>
                 )}
             </div>
             <AppMobileFooter />
