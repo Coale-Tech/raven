@@ -28,6 +28,10 @@ const WorkspaceLayout = () => {
     // path instead; end: false keeps matching with a thread drawer open
     const channelMatch = useMatch({ path: '/:workspaceID/:id', end: false })
     const hasChannelOpen = Boolean(channelMatch)
+    // The Project Hub is a full-bleed record page (CRM Lead style) — it isn't
+    // "inside" a channel the way the chat routes are, so the channel list
+    // (select/pin/customize/add-channel UI) has nothing to do there.
+    const isProjectHub = Boolean(useMatch({ path: '/:workspaceID/project/:projectID', end: false }))
     // No slide when the chat layer is already open on a BACK arrival — see the hook.
     const layerAnimation = useLayerInAnimation(hasChannelOpen)
 
@@ -50,14 +54,16 @@ const WorkspaceLayout = () => {
         // row, which clamped the list's scroll position whenever it sat at the bottom.
         <div className='relative flex flex-col h-full min-h-0 w-full'>
             <div className='flex min-h-0 flex-1'>
-                <div
-                    className='md:w-(--sidebar-width) w-full shrink-0 min-h-0'
-                    // While covered by the channel layer on mobile, keep the sidebar out
-                    // of the focus order / accessibility tree.
-                    inert={isMobile && hasChannelOpen ? true : undefined}
-                >
-                    <ChannelSidebar />
-                </div>
+                {!isProjectHub && (
+                    <div
+                        className='md:w-(--sidebar-width) w-full shrink-0 min-h-0'
+                        // While covered by the channel layer on mobile, keep the sidebar out
+                        // of the focus order / accessibility tree.
+                        inert={isMobile && hasChannelOpen ? true : undefined}
+                    >
+                        <ChannelSidebar />
+                    </div>
+                )}
 
                 {/* Mobile: a full-screen layer above the sidebar while a channel is open,
                     hidden when none is (it would just be an empty surface covering the
