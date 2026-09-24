@@ -7,6 +7,7 @@ import {
     ChevronLeft,
     CircleAlert,
     GitBranch,
+    LayoutDashboard,
     ListChecks,
     Mail,
     MessageSquare,
@@ -25,6 +26,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@componen
 import ProjectSidePanel from "@components/features/project/ProjectSidePanel"
 import ProjectSidePanelContent from "@components/features/project/ProjectSidePanelContent"
 import ChannelTab from "@components/features/project/tabs/ChannelTab"
+import OverviewTab from "@components/features/project/tabs/OverviewTab"
 import TasksTab from "@components/features/project/tabs/TasksTab"
 import NotesTab from "@components/features/project/tabs/NotesTab"
 import CommunicationTab from "@components/features/project/tabs/CommunicationTab"
@@ -49,7 +51,7 @@ export type ProjectSummary = {
     channel: string | null
 }
 
-type TabKey = "channel" | "tasks" | "notes" | "communication" | "github" | "billing" | "issues"
+type TabKey = "channel" | "overview" | "tasks" | "notes" | "communication" | "github" | "billing" | "issues"
 
 const LAST_TAB_KEY = "ravenLastProjectTab"
 
@@ -66,6 +68,12 @@ const TABS: {
         icon: MessageSquare,
         panel: ChannelTab,
         contentClassName: "flex flex-1 min-h-0 flex-col overflow-hidden p-0",
+    },
+    {
+        key: "overview",
+        label: "Overview",
+        icon: LayoutDashboard,
+        panel: OverviewTab,
     },
     {
         key: "tasks",

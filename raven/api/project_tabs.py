@@ -184,3 +184,28 @@ def get_changelog(project: str) -> dict | None:
 	if not repo:
 		return None
 	return fetch_changelog(repo)
+
+
+@frappe.whitelist()
+def get_overview(project: str) -> dict:
+	_check(project)
+	overview = frappe.db.get_value(
+		"Project",
+		project,
+		["notes", "project_type", "priority", "department", "actual_start_date", "actual_end_date"],
+		as_dict=True,
+	)
+	overview["task_counts"] = frappe.get_list(
+		"Task", filters={"project": project}, group_by="status", fields=["status", {"COUNT": "name", "as": "count"}]
+	)
+	overview["issue_counts"] = (
+		frappe.get_list(
+			"Issue",
+			filters={"project": project},
+			group_by="status",
+			fields=["status", {"COUNT": "name", "as": "count"}],
+		)
+		if frappe.has_permission("Issue", "read")
+		else None
+	)
+	return overview

@@ -1,16 +1,18 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useFrappeGetCall } from "frappe-react-sdk"
 import { useNavigate } from "react-router-dom"
 import type { ColumnDef } from "@tanstack/react-table"
-import { FolderKanban } from "lucide-react"
+import { FolderKanban, Plus } from "lucide-react"
 import { PageHeader } from "@components/layout/PageHeader"
 import AppMobileFooter from "@components/features/header/AppMobileFooter"
 import { Badge } from "@components/ui/badge"
+import { Button } from "@components/ui/button"
 import { Progress } from "@components/ui/progress"
 import { Skeleton } from "@components/ui/skeleton"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@components/ui/empty"
 import ErrorBanner from "@components/ui/error-banner"
 import { ListView, type ListViewColumnMeta } from "@components/ui/list-view"
+import CreateProjectDialog from "@components/features/project/CreateProjectDialog"
 import { useWorkspaces } from "@hooks/useWorkspaces"
 import _ from "@lib/translate"
 
@@ -38,14 +40,20 @@ const Projects = () => {
     const navigate = useNavigate()
     const { workspaces } = useWorkspaces()
     const fallbackWorkspace = workspaces[0]?.name
+    const [createOpen, setCreateOpen] = useState(false)
 
-    const { data, error, isLoading } = useFrappeGetCall<{ message: ProjectRow[] }>(
+    const { data, error, isLoading, mutate } = useFrappeGetCall<{ message: ProjectRow[] }>(
         "raven.api.project_hub.list_my_projects",
         undefined,
         "my_projects_list",
         { revalidateOnFocus: false },
     )
     const projects = data?.message ?? []
+
+    const handleProjectCreated = (project: string) => {
+        mutate()
+        openProject({ name: project, project_name: project, status: "Open", percent_complete: 0, channel: null, workspace: null })
+    }
 
     const stats = useMemo(
         () => [
@@ -104,7 +112,14 @@ const Projects = () => {
 
     return (
         <div className="flex flex-col h-dvh overflow-hidden">
-            <PageHeader title={_("Projects")} />
+            <PageHeader title={_("Projects")}>
+                <div className="ml-auto">
+                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                        <Plus />
+                        {_("New Project")}
+                    </Button>
+                </div>
+            </PageHeader>
             <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-4">
                 {error ? (
                     <ErrorBanner error={error} overrideHeading={_("Could not load projects")} />
@@ -145,6 +160,7 @@ const Projects = () => {
                 )}
             </div>
             <AppMobileFooter />
+            <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={handleProjectCreated} />
         </div>
     )
 }

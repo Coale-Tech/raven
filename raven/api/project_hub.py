@@ -42,6 +42,26 @@ def list_my_projects() -> list[dict]:
 
 
 @frappe.whitelist(methods=["POST"])
+def create_project(
+	project_name: str, company: str, customer: str | None = None, expected_end_date: str | None = None
+) -> str:
+	"""Projects list → "New Project" dialog. `frappe.new_doc` fills every other
+	Project default (status, naming_series, ...) the same way Desk's New button
+	does; the after_insert hook creates the project's channel synchronously.
+	"""
+	frappe.has_permission("Project", "create", throw=True)
+	doc = frappe.new_doc(
+		"Project",
+		project_name=project_name,
+		company=company,
+		customer=customer or None,
+		expected_end_date=expected_end_date or None,
+	)
+	doc.insert()
+	return doc.name
+
+
+@frappe.whitelist(methods=["POST"])
 def link_project(project: str, channel_id: str | None = None, workspace: str | None = None) -> None:
 	if bool(channel_id) == bool(workspace):
 		frappe.throw(_("Provide exactly one of channel_id or workspace"))
