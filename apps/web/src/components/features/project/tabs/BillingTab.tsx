@@ -1,5 +1,7 @@
 import { useFrappeGetCall } from "frappe-react-sdk"
+import { PlusIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
+import { Button } from "@components/ui/button"
 import ErrorBanner from "@components/ui/error-banner"
 import { Spinner } from "@components/ui/spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@components/ui/table"
@@ -38,6 +40,16 @@ type Billing = {
     invoices: Invoice[] | null
     orders: Order[] | null
     currency: string | null
+    customer: string | null
+    can_create_invoice: boolean
+    can_create_order: boolean
+}
+
+/** Opens a Desk "new document" form pre-filled via Frappe's URL-query route_options convention. */
+const newDocUrl = (doctype: string, project: string, customer: string | null) => {
+    const params = new URLSearchParams({ project })
+    if (customer) params.set("customer", customer)
+    return `/app/${doctype}/new?${params.toString()}`
 }
 
 /** Project Hub → Billing: totals strip plus Invoices/Orders tables (a `null` table means no read permission). */
@@ -58,7 +70,7 @@ export default function BillingTab({ project }: { project: string }) {
     if (error) return <ErrorBanner error={error} />
     if (!data) return null
 
-    const { totals, invoices, orders, currency } = data.message
+    const { totals, invoices, orders, currency, customer, can_create_invoice, can_create_order } = data.message
     const format = (amount: number | null) =>
         new Intl.NumberFormat(undefined, { style: "currency", currency: currency ?? "USD" }).format(amount ?? 0)
 
@@ -84,7 +96,19 @@ export default function BillingTab({ project }: { project: string }) {
 
             {invoices !== null && (
                 <section className="flex flex-col gap-2">
-                    <h3 className="text-sm-medium text-ink-gray-7">{_("Sales Invoices")}</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm-medium text-ink-gray-7">{_("Sales Invoices")}</h3>
+                        {can_create_invoice && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(newDocUrl("sales-invoice", project, customer), "_blank")}
+                            >
+                                <PlusIcon />
+                                {_("New Invoice")}
+                            </Button>
+                        )}
+                    </div>
                     {invoices.length === 0 ? (
                         <p className="text-sm text-ink-gray-5">{_("No invoices yet.")}</p>
                     ) : (
@@ -135,7 +159,19 @@ export default function BillingTab({ project }: { project: string }) {
 
             {orders !== null && (
                 <section className="flex flex-col gap-2">
-                    <h3 className="text-sm-medium text-ink-gray-7">{_("Sales Orders")}</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm-medium text-ink-gray-7">{_("Sales Orders")}</h3>
+                        {can_create_order && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(newDocUrl("sales-order", project, customer), "_blank")}
+                            >
+                                <PlusIcon />
+                                {_("New Order")}
+                            </Button>
+                        )}
+                    </div>
                     {orders.length === 0 ? (
                         <p className="text-sm text-ink-gray-5">{_("No orders yet.")}</p>
                     ) : (

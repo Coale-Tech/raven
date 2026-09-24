@@ -127,10 +127,12 @@ def get_billing(project: str) -> dict:
 			"gross_margin",
 			"per_gross_margin",
 			"company",
+			"customer",
 		],
 		as_dict=True,
 	)
 	company = totals.pop("company", None)
+	customer = totals.pop("customer", None)
 
 	invoices = None
 	if frappe.has_permission("Sales Invoice", "read"):
@@ -157,6 +159,9 @@ def get_billing(project: str) -> dict:
 		"invoices": invoices,
 		"orders": orders,
 		"currency": frappe.get_cached_value("Company", company, "default_currency") if company else None,
+		"customer": customer,
+		"can_create_invoice": bool(frappe.has_permission("Sales Invoice", "create")),
+		"can_create_order": bool(frappe.has_permission("Sales Order", "create")),
 	}
 
 
