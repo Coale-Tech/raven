@@ -9,6 +9,7 @@ import {
     GitBranch,
     ListChecks,
     Mail,
+    MessageSquare,
     NotepadText,
     PanelRight,
     Receipt,
@@ -23,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@components/ui/tabs"
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@components/ui/drawer"
 import ProjectSidePanel from "@components/features/project/ProjectSidePanel"
 import ProjectSidePanelContent from "@components/features/project/ProjectSidePanelContent"
+import ChannelTab from "@components/features/project/tabs/ChannelTab"
 import TasksTab from "@components/features/project/tabs/TasksTab"
 import NotesTab from "@components/features/project/tabs/NotesTab"
 import CommunicationTab from "@components/features/project/tabs/CommunicationTab"
@@ -47,11 +49,24 @@ export type ProjectSummary = {
     channel: string | null
 }
 
-type TabKey = "tasks" | "notes" | "communication" | "github" | "billing" | "issues"
+type TabKey = "channel" | "tasks" | "notes" | "communication" | "github" | "billing" | "issues"
 
 const LAST_TAB_KEY = "ravenLastProjectTab"
 
-const TABS: { key: TabKey; label: string; icon: LucideIcon; panel: ComponentType<{ project: string }> }[] = [
+const TABS: {
+    key: TabKey
+    label: string
+    icon: LucideIcon
+    panel: ComponentType<{ project: string; channel: string | null }>
+    contentClassName?: string
+}[] = [
+    {
+        key: "channel",
+        label: "Channel",
+        icon: MessageSquare,
+        panel: ChannelTab,
+        contentClassName: "flex flex-1 min-h-0 flex-col overflow-hidden p-0",
+    },
     { key: "tasks", label: "Tasks", icon: ListChecks, panel: TasksTab },
     { key: "notes", label: "Notes", icon: NotepadText, panel: NotesTab },
     { key: "communication", label: "Communication", icon: Mail, panel: CommunicationTab },
@@ -137,9 +152,9 @@ export default function ProjectHub() {
                                     </TabsTrigger>
                                 ))}
                             </TabsList>
-                            {TABS.map(({ key, panel: Panel }) => (
-                                <TabsContent key={key} value={key} className="flex-1 min-h-0 overflow-y-auto p-5">
-                                    <Panel project={projectID} />
+                            {TABS.map(({ key, panel: Panel, contentClassName }) => (
+                                <TabsContent key={key} value={key} className={contentClassName ?? "flex-1 min-h-0 overflow-y-auto p-5"}>
+                                    <Panel project={projectID} channel={summary.channel} />
                                 </TabsContent>
                             ))}
                         </Tabs>
