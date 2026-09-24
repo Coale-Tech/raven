@@ -146,7 +146,7 @@ export default function ProjectHub() {
                     )}
                 </div>
 
-                {summary && panelOpen && !isMobile && <ProjectSidePanel summary={summary} workspaceID={workspaceID} channelID={channelID} />}
+                {summary && panelOpen && !isMobile && <ProjectSidePanel summary={summary} />}
             </div>
 
             {summary && isMobile && (
@@ -154,7 +154,7 @@ export default function ProjectHub() {
                     <DrawerContent className="h-[85dvh] pb-0">
                         <DrawerTitle className="sr-only">{_("Project details")}</DrawerTitle>
                         <DrawerDescription className="sr-only">{_("Project status, dates and members")}</DrawerDescription>
-                        <ProjectSidePanelContent summary={summary} workspaceID={workspaceID} channelID={channelID} />
+                        <ProjectSidePanelContent summary={summary} />
                     </DrawerContent>
                 </Drawer>
             )}

@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { useAtom } from "jotai"
-import { useNavigate } from "react-router-dom"
 import { useFrappeGetCall, useFrappePostCall, type FrappeError } from "frappe-react-sdk"
 import { toast } from "sonner"
-import { ChevronRight, GitBranch, MessageSquare, SquareArrowOutUpRight } from "lucide-react"
+import { ChevronRight, GitBranch, SquareArrowOutUpRight } from "lucide-react"
 import { Avatar, AvatarFallback } from "@components/ui/avatar"
 import { Button } from "@components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@components/ui/tooltip"
 import { Progress } from "@components/ui/progress"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@components/ui/collapsible"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select"
@@ -21,8 +19,6 @@ import type { ProjectSummary } from "@pages/project/ProjectHub"
 
 interface ProjectSidePanelContentProps {
     summary: ProjectSummary
-    workspaceID: string
-    channelID?: string
 }
 
 type ProjectBilling = {
@@ -41,8 +37,7 @@ type ProjectBilling = {
 
 const STATUS_OPTIONS = ["Open", "Completed", "Cancelled"]
 
-export default function ProjectSidePanelContent({ summary, workspaceID, channelID }: ProjectSidePanelContentProps) {
-    const navigate = useNavigate()
+export default function ProjectSidePanelContent({ summary }: ProjectSidePanelContentProps) {
     const [sections, setSections] = useAtom(projectPanelSectionsAtom)
 
     // Same SWR key as ProjectHub's get_project_summary call — this hook's `mutate`
@@ -90,22 +85,6 @@ export default function ProjectSidePanelContent({ summary, workspaceID, channelI
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                     <div className="truncate text-3xl-medium text-ink-gray-9">{summary.project_name}</div>
                     <div className="flex items-center gap-1">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span>
-                                    <Button
-                                        variant="outline"
-                                        isIconButton
-                                        disabled={!summary.channel}
-                                        aria-label={_("Open channel")}
-                                        onClick={() => summary.channel && navigate(`/${workspaceID}/${summary.channel}`)}
-                                    >
-                                        <MessageSquare />
-                                    </Button>
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent>{summary.channel ? _("Open channel") : _("No channel linked")}</TooltipContent>
-                        </Tooltip>
                         <Button
                             variant="outline"
                             isIconButton

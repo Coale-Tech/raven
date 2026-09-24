@@ -9,8 +9,6 @@ const MAX_WIDTH = 480
 
 interface ProjectSidePanelProps {
     summary: ProjectSummary
-    workspaceID: string
-    channelID?: string
 }
 
 /**
@@ -19,7 +17,7 @@ interface ProjectSidePanelProps {
  * dependency-free pointer-drag implementation. Same clamp numbers as CRM:
  * min 16rem (256px), max 30rem (480px), default 352px.
  */
-export default function ProjectSidePanel({ summary, workspaceID, channelID }: ProjectSidePanelProps) {
+export default function ProjectSidePanel({ summary }: ProjectSidePanelProps) {
     const [width, setWidth] = useAtom(projectPanelWidthAtom)
     const handleRef = useRef<HTMLDivElement>(null)
 
@@ -49,7 +47,7 @@ export default function ProjectSidePanel({ summary, workspaceID, channelID }: Pr
                 onPointerUp={onPointerUp}
                 className="absolute left-0 inset-y-0 z-10 w-1 cursor-col-resize hover:bg-surface-gray-3"
             />
-            <ProjectSidePanelContent summary={summary} workspaceID={workspaceID} channelID={channelID} />
+            <ProjectSidePanelContent summary={summary} />
         </aside>
     )
 }
