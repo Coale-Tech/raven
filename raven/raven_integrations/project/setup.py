@@ -14,7 +14,15 @@ def setup_project_hub(settings) -> None:
 					"fieldtype": "Data",
 					"insert_after": "project_name",
 					"description": "owner/repo",
-				}
+				},
+				{
+					"fieldname": "raven_project_bot",
+					"label": "Raven Bot",
+					"fieldtype": "Data",
+					"insert_after": "raven_github_repo",
+					"read_only": 1,
+					"description": "Raven Bot that posts this project's task/issue updates",
+				},
 			]
 		},
 		ignore_validate=True,

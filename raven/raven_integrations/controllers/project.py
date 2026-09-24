@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+from raven.raven_integrations.project.bot import ensure_project_bot
 from raven.raven_integrations.project.utils import channel_for_project, hub_enabled, sync_members
 
 
@@ -28,6 +29,11 @@ def after_insert(doc, method):
 
 	users = [doc.owner] + [row.user for row in doc.users]
 	sync_members(channel.name, users)
+
+	bot = ensure_project_bot(doc)
+	doc.db_set("raven_project_bot", bot.name, update_modified=False)
+	if bot.raven_user:
+		channel.add_members([bot.raven_user])
 
 
 def on_update(doc, method):

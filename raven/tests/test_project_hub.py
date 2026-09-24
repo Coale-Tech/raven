@@ -4,6 +4,7 @@ from frappe.tests import IntegrationTestCase
 from raven.api.project_hub import link_project, project_for_channel, set_project_field, unlink_project
 from raven.raven_integrations.project.github import fetch_changelog
 from raven.raven_integrations.project.setup import setup_project_hub
+from raven.raven_integrations.project.utils import channel_for_project
 
 EXTRA_TEST_RECORD_DEPENDENCIES = ["User", "Raven User"]
 
@@ -138,3 +139,58 @@ class TestProjectHub(IntegrationTestCase):
 
 		with self.assertRaises(frappe.ValidationError):
 			set_project_field(self.project.name, "company", "X")
+
+	def test_issue_insert_and_status_post_to_channel(self):
+		link_project(self.project.name, channel_id=self.channel.name)
+
+		issue = frappe.get_doc(
+			{
+				"doctype": "Issue",
+				"subject": "PH Test Issue",
+				"project": self.project.name,
+				"status": "Open",
+			}
+		).insert()
+
+		issue.status = "Resolved"
+		issue.save()
+
+		messages = frappe.get_all(
+			"Raven Message",
+			filters={"channel_id": self.channel.name, "bot": "Project Bot"},
+			fields=["text"],
+			order_by="creation asc",
+		)
+
+		self.assertEqual(len(messages), 2)
+		self.assertIn("Resolved", messages[1].text)
+
+	def test_auto_created_project_gets_named_bot(self):
+		settings = frappe.get_single("Raven Settings")
+		settings.auto_create_project_channel = 1
+		settings.project_workspace = self.workspace.name
+		settings.save()
+
+		project = frappe.get_doc(
+			{"doctype": "Project", "project_name": "PH Named Bot Test", "company": "_Test Company"}
+		).insert()
+
+		self.assertEqual(project.raven_project_bot, "PH Named Bot Test Bot")
+		self.assertTrue(frappe.db.exists("Raven Bot", "PH Named Bot Test Bot"))
+
+		channel = channel_for_project(project.name)
+		bot_raven_user = frappe.db.get_value("Raven Bot", "PH Named Bot Test Bot", "raven_user")
+		self.assertTrue(
+			frappe.db.exists("Raven Channel Member", {"channel_id": channel, "user_id": bot_raven_user})
+		)
+
+		frappe.get_doc(
+			{"doctype": "Task", "subject": "Named Bot Task", "project": project.name, "status": "Open"}
+		).insert()
+
+		messages = frappe.get_all(
+			"Raven Message",
+			filters={"channel_id": channel, "bot": "PH Named Bot Test Bot"},
+			fields=["text"],
+		)
+		self.assertEqual(len(messages), 1)

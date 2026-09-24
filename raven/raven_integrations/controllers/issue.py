@@ -1,6 +1,5 @@
 import frappe
 from frappe import _
-from frappe.utils import get_fullname
 
 from raven.raven_integrations.project.utils import channel_for_project, hub_enabled, project_bot_for
 
@@ -8,11 +7,8 @@ from raven.raven_integrations.project.utils import channel_for_project, hub_enab
 def after_insert(doc, method):
 	_post(
 		doc,
-		_("New task **{0}** · {1} priority · due {2} · by {3}").format(
-			doc.subject,
-			doc.priority,
-			frappe.format(doc.exp_end_date, "Datetime") if doc.exp_end_date else _("no date"),
-			get_fullname(doc.owner),
+		_("New issue **{0}** · {1} priority · raised by {2}").format(
+			doc.subject, doc.priority or _("no priority"), doc.raised_by or doc.owner
 		),
 	)
 
@@ -25,7 +21,7 @@ def on_update(doc, method):
 	if not before:
 		return
 
-	_post(doc, _("Task **{0}**: {1} → {2}").format(doc.subject, before.status, doc.status))
+	_post(doc, _("Issue **{0}**: {1} → {2}").format(doc.subject, before.status, doc.status))
 
 
 def _post(doc, text: str) -> None:
@@ -41,5 +37,5 @@ def _post(doc, text: str) -> None:
 		return
 
 	frappe.get_doc("Raven Bot", bot).send_message(
-		channel, text, link_doctype="Task", link_document=doc.name, markdown=True
+		channel, text, link_doctype="Issue", link_document=doc.name, markdown=True
 	)

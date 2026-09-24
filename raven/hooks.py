@@ -160,6 +160,10 @@ doc_events = {
 		"after_insert": "raven.raven_integrations.controllers.task.after_insert",
 		"on_update": "raven.raven_integrations.controllers.task.on_update",
 	},
+	"Issue": {
+		"after_insert": "raven.raven_integrations.controllers.issue.after_insert",
+		"on_update": "raven.raven_integrations.controllers.issue.on_update",
+	},
 }
 
 # Scheduled Tasks

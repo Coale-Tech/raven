@@ -34,6 +34,18 @@ def hub_enabled() -> bool:
 	return bool(frappe.db.get_single_value("Raven Settings", "enable_project_hub"))
 
 
+def project_bot_for(project: str) -> str | None:
+	"""The Raven Bot that should post Task/Issue updates for a Project.
+
+	Prefers the project's own named bot (created alongside its auto-created
+	channel); falls back to the shared Raven Settings bot for projects that
+	predate this field or never got an auto-created channel.
+	"""
+	return frappe.db.get_value("Project", project, "raven_project_bot") or frappe.db.get_single_value(
+		"Raven Settings", "project_bot"
+	)
+
+
 def sync_members(channel_id: str, users: list[str]) -> None:
 	"""Add each Frappe User (that has a Raven User) as a member of channel_id.
 
