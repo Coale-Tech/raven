@@ -9,17 +9,18 @@ def setup_project_hub(settings) -> None:
 		{
 			"Project": [
 				{
-					"fieldname": "raven_github_repo",
-					"label": "GitHub Repository",
-					"fieldtype": "Data",
+					"fieldname": "raven_github_repos",
+					"label": "GitHub Repositories",
+					"fieldtype": "Table",
+					"options": "Raven Project Repository",
 					"insert_after": "project_name",
-					"description": "owner/repo",
+					"description": "Repositories tracked in the Project Hub GitHub tab",
 				},
 				{
 					"fieldname": "raven_project_bot",
 					"label": "Raven Bot",
 					"fieldtype": "Data",
-					"insert_after": "raven_github_repo",
+					"insert_after": "raven_github_repos",
 					"read_only": 1,
 					"description": "Raven Bot that posts this project's task/issue updates",
 				},
@@ -30,6 +31,7 @@ def setup_project_hub(settings) -> None:
 
 	_ensure_project_bot(settings)
 	_ensure_create_task_action()
+	_ensure_implementation_project_type()
 
 
 def _ensure_project_bot(settings) -> None:
@@ -43,6 +45,21 @@ def _ensure_project_bot(settings) -> None:
 		).insert(ignore_permissions=True)
 
 	settings.db_set("project_bot", "Project Bot")
+
+
+def _ensure_implementation_project_type() -> None:
+	"""Project Type for repo-tracked software projects — selectable when creating a
+	Project, and what the GitHub tab's multi-repo picker is meant for."""
+	if frappe.db.exists("Project Type", "Implementation"):
+		return
+
+	frappe.get_doc(
+		{
+			"doctype": "Project Type",
+			"project_type": "Implementation",
+			"description": _("Software implementation project tracked against one or more GitHub repositories."),
+		}
+	).insert(ignore_permissions=True)
 
 
 def _ensure_create_task_action() -> None:

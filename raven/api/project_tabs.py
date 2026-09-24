@@ -178,12 +178,10 @@ def get_issues(project: str) -> list[dict]:
 
 
 @frappe.whitelist()
-def get_changelog(project: str) -> dict | None:
+def get_changelog(project: str) -> list[dict]:
 	_check(project)
-	repo = frappe.db.get_value("Project", project, "raven_github_repo")
-	if not repo:
-		return None
-	return fetch_changelog(repo)
+	repos = [row.repository for row in frappe.get_doc("Project", project).raven_github_repos]
+	return [fetch_changelog(repo) for repo in repos]
 
 
 @frappe.whitelist()

@@ -1,7 +1,15 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from raven.api.project_hub import link_project, project_for_channel, set_project_field, unlink_project
+from raven.api.project_hub import (
+	add_project_repo,
+	link_project,
+	project_for_channel,
+	remove_project_repo,
+	set_project_field,
+	unlink_project,
+)
+from raven.api.project_tabs import get_changelog
 from raven.raven_integrations.project.github import fetch_changelog
 from raven.raven_integrations.project.setup import setup_project_hub
 from raven.raven_integrations.project.utils import channel_for_project
@@ -139,6 +147,20 @@ class TestProjectHub(IntegrationTestCase):
 
 		with self.assertRaises(frappe.ValidationError):
 			set_project_field(self.project.name, "company", "X")
+
+	def test_project_repo_add_remove(self):
+		self.assertEqual(add_project_repo(self.project.name, "frappe/raven"), ["frappe/raven"])
+		# Adding the same repo again is a no-op, not a duplicate row.
+		self.assertEqual(add_project_repo(self.project.name, "frappe/raven"), ["frappe/raven"])
+		self.assertEqual(remove_project_repo(self.project.name, "frappe/raven"), [])
+
+	def test_project_repo_rejects_bad_repo(self):
+		# Fails REPO_PATTERN in add_project_repo before it ever appends a row.
+		with self.assertRaises(frappe.ValidationError):
+			add_project_repo(self.project.name, "../../etc/passwd")
+
+	def test_changelog_empty_without_repos(self):
+		self.assertEqual(get_changelog(self.project.name), [])
 
 	def test_issue_insert_and_status_post_to_channel(self):
 		link_project(self.project.name, channel_id=self.channel.name)

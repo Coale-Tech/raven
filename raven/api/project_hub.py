@@ -1,11 +1,10 @@
 import frappe
 from frappe import _
 
+from raven.raven_integrations.project.github import REPO_PATTERN, list_available_repos
 from raven.raven_integrations.project.utils import channel_for_project, project_for_channel
 
-ALLOWED_PROJECT_FIELDS = frozenset(
-	{"status", "expected_start_date", "expected_end_date", "customer", "raven_github_repo"}
-)
+ALLOWED_PROJECT_FIELDS = frozenset({"status", "expected_start_date", "expected_end_date", "customer", "project_type"})
 
 
 @frappe.whitelist()
@@ -109,9 +108,10 @@ def get_project_summary(project: str) -> dict:
 			"expected_end_date",
 			"customer",
 			"company",
-			"raven_github_repo",
+			"project_type",
 		)
 	}
+	summary["github_repos"] = [row.repository for row in doc.raven_github_repos]
 	summary["users"] = [row.user for row in doc.users]
 	summary["channel"] = channel_for_project(doc.name)
 	return summary
@@ -127,3 +127,34 @@ def set_project_field(project: str, fieldname: str, value: str | None) -> str | 
 	doc.set(fieldname, value or None)
 	doc.save()
 	return doc.get(fieldname)
+
+
+@frappe.whitelist()
+def list_available_github_repos() -> list[dict]:
+	"""Repositories the site's GitHub token can access, for the repo picker."""
+	if not frappe.db.get_single_value("Raven Settings", "enable_project_hub"):
+		return []
+	return list_available_repos()
+
+
+@frappe.whitelist(methods=["POST"])
+def add_project_repo(project: str, repository: str) -> list[str]:
+	if not REPO_PATTERN.fullmatch(repository or ""):
+		frappe.throw(_("Invalid GitHub repository: {0}").format(repository))
+	doc = frappe.get_doc("Project", project)
+	doc.check_permission("write")
+	if repository not in {row.repository for row in doc.raven_github_repos}:
+		doc.append("raven_github_repos", {"repository": repository})
+		doc.save()
+	return [row.repository for row in doc.raven_github_repos]
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_project_repo(project: str, repository: str) -> list[str]:
+	doc = frappe.get_doc("Project", project)
+	doc.check_permission("write")
+	for row in list(doc.raven_github_repos):
+		if row.repository == repository:
+			doc.remove(row)
+	doc.save()
+	return [row.repository for row in doc.raven_github_repos]

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { useAtom } from "jotai"
 import { useFrappeGetCall, useFrappePostCall, type FrappeError } from "frappe-react-sdk"
 import { toast } from "sonner"
-import { ChevronRight, GitBranch, SquareArrowOutUpRight } from "lucide-react"
+import { ChevronRight, SquareArrowOutUpRight } from "lucide-react"
 import { Avatar, AvatarFallback } from "@components/ui/avatar"
 import { Button } from "@components/ui/button"
 import { Progress } from "@components/ui/progress"
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@components/ui/input"
 import { GroupedAvatars } from "@components/ui/grouped-avatars"
 import LinkFieldCombobox from "@components/common/LinkFieldComboBox/LinkFieldCombobox"
+import GitHubRepoField from "@components/features/project/GitHubRepoField"
 import { errorResponseToast } from "@components/ui/error-banner"
 import { projectPanelSectionsAtom, type ProjectPanelSections } from "@utils/projectAtoms"
 import _ from "@lib/translate"
@@ -93,16 +94,6 @@ export default function ProjectSidePanelContent({ summary }: ProjectSidePanelCon
                         >
                             <SquareArrowOutUpRight />
                         </Button>
-                        {summary.raven_github_repo && (
-                            <Button
-                                variant="outline"
-                                isIconButton
-                                aria-label={_("Open GitHub repository")}
-                                onClick={() => window.open(`https://github.com/${summary.raven_github_repo}`, "_blank")}
-                            >
-                                <GitBranch />
-                            </Button>
-                        )}
                     </div>
                 </div>
             </div>
@@ -125,12 +116,16 @@ export default function ProjectSidePanelContent({ summary }: ProjectSidePanelCon
                 <Row label={_("Customer")}>
                     <CustomerField value={summary.customer} onSave={(v) => saveField("customer", v)} />
                 </Row>
+                <Row label={_("Project Type")}>
+                    <ProjectTypeField value={summary.project_type} onSave={(v) => saveField("project_type", v)} />
+                </Row>
                 <Row label={_("Company")}>
                     <span className="truncate text-sm text-ink-gray-8">{summary.company || "—"}</span>
                 </Row>
-                <Row label={_("GitHub Repository")}>
-                    <TextField value={summary.raven_github_repo} onSave={(v) => saveField("raven_github_repo", v)} />
-                </Row>
+                <div className="flex flex-col gap-1 px-3 pt-1">
+                    <div className="text-sm text-ink-gray-5">{_("GitHub Repositories")}</div>
+                    <GitHubRepoField project={summary.name} repos={summary.github_repos} onChange={mutate} />
+                </div>
             </PanelSection>
 
             {billing?.invoices !== null && billing?.totals && (
@@ -171,19 +166,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const fieldClassName = "h-7 border-none bg-transparent px-1 hover:bg-surface-gray-2"
-
-function TextField({ value, onSave }: { value?: string | null; onSave: (v: string | null) => Promise<unknown> }) {
-    const [text, setText] = useState(value ?? "")
-    useEffect(() => setText(value ?? ""), [value])
-    const commit = () => {
-        if (text === (value ?? "")) return
-        onSave(text || null).catch((e: FrappeError) => {
-            setText(value ?? "")
-            errorResponseToast(_("Could not save"), e)
-        })
-    }
-    return <Input value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} className={fieldClassName} />
-}
 
 function DateField({ value, onSave }: { value?: string | null; onSave: (v: string | null) => Promise<unknown> }) {
     const [date, setDate] = useState(value ?? "")
@@ -238,6 +220,20 @@ function CustomerField({ value, onSave }: { value?: string | null; onSave: (v: s
         })
     }
     return <LinkFieldCombobox doctype="Customer" value={customer} onChange={commit} clearable />
+}
+
+function ProjectTypeField({ value, onSave }: { value?: string | null; onSave: (v: string | null) => Promise<unknown> }) {
+    const [projectType, setProjectType] = useState(value ?? "")
+    useEffect(() => setProjectType(value ?? ""), [value])
+    const commit = (next: string) => {
+        const prev = projectType
+        setProjectType(next)
+        onSave(next || null).catch((e: FrappeError) => {
+            setProjectType(prev)
+            errorResponseToast(_("Could not update project type"), e)
+        })
+    }
+    return <LinkFieldCombobox doctype="Project Type" value={projectType} onChange={commit} clearable />
 }
 
 function BillingRows({ totals, currency }: { totals: NonNullable<ProjectBilling["totals"]>; currency: string | null }) {

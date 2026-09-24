@@ -11,9 +11,9 @@ type Release = { name: string; tag_name: string; published_at: string | null; ht
 type Commit = { sha: string; message: string; author: string | null; date: string | null; html_url: string }
 type Changelog = { repo: string; releases: Release[]; commits: Commit[] }
 
-/** Project Hub → GitHub: releases + recent commits for the Project's linked repo. */
+/** Project Hub → GitHub: releases + recent commits, one section per linked repo. */
 export default function GitHubTab({ project }: { project: string }) {
-    const { data, error } = useFrappeGetCall<{ message: Changelog | null }>(
+    const { data, error } = useFrappeGetCall<{ message: Changelog[] }>(
         "raven.api.project_tabs.get_changelog",
         { project },
         ["project_changelog", project],
@@ -28,17 +28,17 @@ export default function GitHubTab({ project }: { project: string }) {
     }
     if (error) return <ErrorBanner error={error} />
 
-    const changelog = data?.message ?? null
+    const changelogs = data?.message ?? []
 
-    if (!changelog) {
+    if (changelogs.length === 0) {
         return (
             <Empty>
                 <EmptyHeader>
                     <EmptyMedia>
                         <GitBranchIcon />
                     </EmptyMedia>
-                    <EmptyTitle>{_("No GitHub repository set")}</EmptyTitle>
-                    <EmptyDescription>{_("Set GitHub Repository on the Project to see its changelog.")}</EmptyDescription>
+                    <EmptyTitle>{_("No GitHub repositories linked")}</EmptyTitle>
+                    <EmptyDescription>{_("Add a repository from the side panel to see its changelog.")}</EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
                     <a
@@ -56,6 +56,27 @@ export default function GitHubTab({ project }: { project: string }) {
 
     return (
         <div className="flex flex-col gap-6">
+            {changelogs.map((changelog) => (
+                <RepoChangelog key={changelog.repo} changelog={changelog} />
+            ))}
+        </div>
+    )
+}
+
+/** One linked repo's releases + commits, so each application's history reads separately. */
+function RepoChangelog({ changelog }: { changelog: Changelog }) {
+    return (
+        <div className="flex flex-col gap-4 rounded-lg border border-outline-gray-2 p-4">
+            <a
+                href={`https://github.com/${changelog.repo}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-fit items-center gap-2 text-base-medium text-ink-gray-9 hover:underline"
+            >
+                <GitBranchIcon className="size-4" />
+                {changelog.repo}
+                <ExternalLinkIcon className="size-3.5 text-ink-gray-5" />
+            </a>
             <section className="flex flex-col gap-3">
                 <h3 className="text-sm-medium text-ink-gray-7">{_("Releases")}</h3>
                 {changelog.releases.length === 0 ? (

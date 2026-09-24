@@ -46,7 +46,8 @@ export type ProjectSummary = {
     expected_end_date: string | null
     customer: string | null
     company: string | null
-    raven_github_repo: string | null
+    project_type: string | null
+    github_repos: string[]
     users: string[]
     channel: string | null
 }
