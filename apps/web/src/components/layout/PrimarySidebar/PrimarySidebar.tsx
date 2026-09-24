@@ -6,6 +6,7 @@ import { KeyboardMetaKeyIcon } from "@components/ui/keyboard-keys"
 import { Separator } from "@components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@components/ui/tooltip"
 import { useUnreadNotificationsCount } from "@hooks/useNotifications"
+import { useRavenSettings } from "@hooks/fetchers/useRavenSettings"
 import { useUnreadReminderCount } from "@components/features/reminders/useReminders"
 import { useWorkspaces, type WorkspaceFields } from "@hooks/useWorkspaces"
 import { useDMUnread, useWorkspaceUnread } from "@stores/unread/useChannelUnread"
@@ -13,7 +14,7 @@ import { useUnreadThreadsCount } from "@stores/threads/useUnreadThreads"
 import _ from "@lib/translate"
 import { cn } from "@lib/utils"
 import { useAtom, useSetAtom } from "jotai"
-import { BellIcon, BookmarkIcon, CalendarClockIcon, MessageSquareTextIcon, MoreHorizontalIcon, SearchIcon, UsersIcon } from "lucide-react"
+import { BellIcon, BookmarkIcon, CalendarClockIcon, FolderKanbanIcon, MessageSquareTextIcon, MoreHorizontalIcon, SearchIcon, UsersIcon } from "lucide-react"
 import { NavLink } from "react-router"
 import { settingsDialogOpenTab } from "@components/features/settings/settingsDialogAtom"
 import { useMemo } from "react"
@@ -66,6 +67,7 @@ const PrimarySidebar = () => {
                     <NotificationsLink />
                     <DirectMessagesLink />
                     <ThreadsLink />
+                    <ProjectsLink />
                     <div className="px-3.5 w-full">
                         <Separator />
                     </div>
@@ -212,6 +214,21 @@ const ThreadsLink = () => {
             <IconBox isActive={isActive} title={_("Threads")}>
                 <MessageSquareTextIcon />
                 <UnreadBadge count={unread} />
+            </IconBox>
+        )}
+    </NavLink>
+}
+
+const ProjectsLink = () => {
+    // Hidden until an admin turns Project Hub on — a dead nav entry to an
+    // empty list is worse than no entry at all.
+    const { ravenSettings } = useRavenSettings()
+    if (ravenSettings?.enable_project_hub !== 1) return null
+
+    return <NavLink to="projects">
+        {({ isActive }) => (
+            <IconBox isActive={isActive} title={_("Projects")}>
+                <FolderKanbanIcon />
             </IconBox>
         )}
     </NavLink>

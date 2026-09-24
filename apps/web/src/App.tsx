@@ -44,6 +44,7 @@ const MobileProfile = lazy(() => import("@pages/profile/Profile"))
 const Search = lazy(() => import("@pages/search/Search"))
 const ScheduledMessages = lazy(() => import("@pages/scheduled-messages/ScheduledMessages"))
 const ProjectHub = lazy(() => import("@pages/project/ProjectHub"))
+const Projects = lazy(() => import("@pages/projects/Projects"))
 
 /**
  * Home ("/") redirect, evaluated at RENDER time — module-scope reads froze
@@ -116,6 +117,7 @@ const router = createBrowserRouter(
       <Route path="threads" element={<Threads />}>
         <Route path=":threadID" element={<ThreadDrawerRoute />} />
       </Route>
+      <Route path="projects" element={<Suspense key="projects" fallback={<ListPageSkeleton title={_("Projects")} />}><Projects /></Suspense>} />
       {/* The `key` on every lazy route's Suspense is LOAD-BEARING. Adjacent
           lazy routes render the same shape at the same Outlet position, so
           without keys React reconciles them into ONE reused Suspense instance

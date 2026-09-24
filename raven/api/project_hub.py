@@ -18,6 +18,29 @@ def get_project_for_channel(channel_id: str) -> str | None:
 	return None
 
 
+@frappe.whitelist()
+def list_my_projects() -> list[dict]:
+	"""Projects visible to the current user, for the global Projects sidebar list.
+
+	get_list applies standard Project permission rules (incl. the `users` child
+	table permlevel), so a non-admin only sees projects they're assigned to.
+	"""
+	if not frappe.db.get_single_value("Raven Settings", "enable_project_hub"):
+		return []
+
+	projects = frappe.get_list(
+		"Project",
+		fields=["name", "project_name", "status", "percent_complete"],
+		order_by="modified desc",
+		limit_page_length=200,
+	)
+	for project in projects:
+		channel = channel_for_project(project.name)
+		project["channel"] = channel
+		project["workspace"] = frappe.db.get_value("Raven Channel", channel, "workspace") if channel else None
+	return projects
+
+
 @frappe.whitelist(methods=["POST"])
 def link_project(project: str, channel_id: str | None = None, workspace: str | None = None) -> None:
 	if bool(channel_id) == bool(workspace):
