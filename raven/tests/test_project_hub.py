@@ -10,6 +10,7 @@ from raven.api.project_hub import (
 	unlink_project,
 )
 from raven.api.project_tabs import get_changelog
+from raven.raven_integrations.project.drive import suite_installed
 from raven.raven_integrations.project.github import fetch_changelog
 from raven.raven_integrations.project.setup import setup_project_hub
 from raven.raven_integrations.project.utils import channel_for_project
@@ -216,3 +217,32 @@ class TestProjectHub(IntegrationTestCase):
 			fields=["text"],
 		)
 		self.assertEqual(len(messages), 1)
+
+	def test_project_drive_team_tracks_project_users(self):
+		if not suite_installed():
+			self.skipTest("Suite (Drive) is not installed")
+
+		project = frappe.get_doc(
+			{
+				"doctype": "Project",
+				"project_name": "PH Drive Test",
+				"company": "_Test Company",
+				"users": [{"user": "test@example.com"}, {"user": "test1@example.com"}],
+			}
+		).insert()
+		team = frappe.db.get_value("File", project.raven_drive_folder, "team")
+		members = frappe.get_all("Drive Team Member", filters={"parent": team}, pluck="user")
+		self.assertCountEqual(members, ["Administrator", "test@example.com", "test1@example.com"])
+
+		project.reload()
+		project.users = [project.users[0]]
+		project.save()
+		members = frappe.get_all("Drive Team Member", filters={"parent": team}, pluck="user")
+		self.assertCountEqual(members, ["Administrator", project.users[0].user])
+
+		# A project that predates the feature gets its folder on its next save.
+		project.db_set("raven_drive_folder", None)
+		project.reload()
+		project.save()
+		self.assertTrue(project.raven_drive_folder)
+		self.assertEqual(frappe.db.get_value("File", project.raven_drive_folder, "team"), team)

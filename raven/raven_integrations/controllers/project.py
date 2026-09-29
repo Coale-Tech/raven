@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 
 from raven.raven_integrations.project.bot import ensure_project_bot
+from raven.raven_integrations.project.drive import sync_project_folder
 from raven.raven_integrations.project.utils import channel_for_project, hub_enabled, sync_members
 
 
@@ -37,6 +38,10 @@ def after_insert(doc, method):
 
 
 def on_update(doc, method):
+	# on_update also runs right after insert, so this covers new projects and
+	# creates the folder for older projects the next time they are saved.
+	sync_project_folder(doc)
+
 	if not hub_enabled():
 		return
 

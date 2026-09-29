@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils.html_utils import clean_html
 
 from raven.raven_integrations.project.github import fetch_changelog
+from raven.raven_integrations.project.drive import folder_for_project
 
 TASK_STATUSES = ("Open", "Working", "Pending Review", "Completed", "Cancelled")
 
@@ -207,3 +208,99 @@ def get_overview(project: str) -> dict:
 		else None
 	)
 	return overview
+
+
+# Ledger/posting rows are system-generated: never listed, never offered under "Add".
+LEDGER_DOCTYPES = {
+	"GL Entry",
+	"Payment Ledger Entry",
+	"Account Closing Balance",
+	"Stock Ledger Entry",
+	"Stock Reservation Entry",
+}
+
+
+def _project_link_fields() -> dict[str, str]:
+	"""DocType -> its Link-to-Project fieldname (standard + Custom Fields; a `project` field wins)."""
+	pairs = [
+		(r.parent, r.fieldname)
+		for r in frappe.get_all(
+			"DocField",
+			filters={"fieldtype": "Link", "options": "Project"},
+			fields=["parent", "fieldname"],
+			parent_doctype="DocType",
+		)
+	] + [
+		(r.dt, r.fieldname)
+		for r in frappe.get_all(
+			"Custom Field", filters={"fieldtype": "Link", "options": "Project"}, fields=["dt", "fieldname"]
+		)
+	]
+	links: dict[str, str] = {}
+	for dt, fieldname in sorted(pairs, key=lambda p: p[1] != "project"):
+		links.setdefault(dt, fieldname)
+	return links
+
+
+@frappe.whitelist()
+def get_documents(project: str) -> dict:
+	"""Every readable document linked to the Project, grouped by DocType, plus the DocTypes the user may add."""
+	_check(project)
+	groups, addable = [], []
+	for doctype, fieldname in sorted(_project_link_fields().items()):
+		if doctype in LEDGER_DOCTYPES or not frappe.db.exists("DocType", doctype):
+			continue
+		meta = frappe.get_meta(doctype)
+		if meta.istable or meta.issingle or meta.is_virtual:
+			continue
+		if frappe.has_permission(doctype, "create"):
+			addable.append({"doctype": doctype, "fieldname": fieldname})
+		if not frappe.has_permission(doctype, "read"):
+			continue
+		fields = list(
+			dict.fromkeys(["name", "modified", "docstatus"] + [f for f in (meta.title_field, "status") if f and meta.has_field(f)])
+		)
+		rows = frappe.get_list(
+			doctype,
+			filters={fieldname: project},
+			fields=fields,
+			order_by="modified desc",
+			limit_page_length=50,
+		)
+		if rows:
+			groups.append(
+				{
+					"doctype": doctype,
+					"fieldname": fieldname,
+					"title_field": meta.title_field if meta.title_field != "name" else None,
+					"has_status": bool(meta.has_field("status")),
+					"rows": rows,
+				}
+			)
+	return {"groups": groups, "addable": addable}
+
+
+@frappe.whitelist()
+def get_files(project: str) -> dict:
+	"""The Project's Suite Drive folder: ids for upload/deep links plus its direct children.
+
+	`folder` is None when Suite isn't installed or the folder isn't created yet;
+	`files` is None when the user has no Drive access to it.
+	"""
+	_check(project)
+	folder = folder_for_project(project)
+	if not folder:
+		return {"folder": None, "team": None, "files": None, "can_upload": False}
+
+	from suite.drive.api.list import files
+	from suite.drive.api.permissions import user_has_permission
+
+	team = frappe.db.get_value("File", folder, "team")
+	if not user_has_permission(folder, "read"):
+		return {"folder": folder, "team": team, "files": None, "can_upload": False}
+	return {
+		"folder": folder,
+		"team": team,
+		"files": files(team=team, entity_name=folder),
+		"can_upload": bool(user_has_permission(folder, "upload")),
+	}

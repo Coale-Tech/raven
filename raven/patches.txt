@@ -24,3 +24,4 @@ raven.patches.v3_0.backfill_link_normalization #3
 raven.patches.v3_0.set_link_preview_status
 raven.patches.v3_0.add_native_oauth_redirect
 raven.patches.v3_0.migrate_github_repos_to_table
+raven.patches.v3_0.create_project_drive_folders

@@ -6,6 +6,7 @@ import {
     ArrowUpRight,
     ChevronLeft,
     CircleAlert,
+    Files,
     GitBranch,
     LayoutDashboard,
     ListChecks,
@@ -33,6 +34,7 @@ import CommunicationTab from "@components/features/project/tabs/CommunicationTab
 import GitHubTab from "@components/features/project/tabs/GitHubTab"
 import BillingTab from "@components/features/project/tabs/BillingTab"
 import IssuesTab from "@components/features/project/tabs/IssuesTab"
+import DocumentsTab from "@components/features/project/tabs/DocumentsTab"
 import { projectPanelOpenAtom } from "@utils/projectAtoms"
 import { useIsMobile } from "@hooks/use-mobile"
 import _ from "@lib/translate"
@@ -52,7 +54,7 @@ export type ProjectSummary = {
     channel: string | null
 }
 
-type TabKey = "channel" | "overview" | "tasks" | "notes" | "communication" | "github" | "billing" | "issues"
+type TabKey = "channel" | "overview" | "tasks" | "notes" | "communication" | "github" | "billing" | "issues" | "documents"
 
 const LAST_TAB_KEY = "ravenLastProjectTab"
 
@@ -88,6 +90,7 @@ const TABS: {
     { key: "github", label: "GitHub", icon: GitBranch, panel: GitHubTab },
     { key: "billing", label: "Billing", icon: Receipt, panel: BillingTab },
     { key: "issues", label: "Issues", icon: CircleAlert, panel: IssuesTab },
+    { key: "documents", label: "Documents", icon: Files, panel: DocumentsTab },
 ]
 const TAB_KEYS = TABS.map((t) => t.key)
 const isTabKey = (v: string | null): v is TabKey => !!v && (TAB_KEYS as string[]).includes(v)
