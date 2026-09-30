@@ -172,7 +172,7 @@ export default function ProjectHub() {
                             </TabsList>
                             {TABS.map(({ key, panel: Panel, contentClassName }) => (
                                 <TabsContent key={key} value={key} className={contentClassName ?? "flex-1 min-h-0 overflow-y-auto p-5"}>
-                                    <Panel project={projectID} channel={summary.channel} />
+                                    <Panel project={projectID} channel={summary.channel ?? channelID ?? null} />
                                 </TabsContent>
                             ))}
                         </Tabs>
