@@ -6,21 +6,16 @@ from raven.raven_integrations.project.drive import sync_project_folder
 from raven.raven_integrations.project.utils import channel_for_project, hub_enabled, sync_members
 
 
-def after_insert(doc, method):
-	settings = frappe.get_single("Raven Settings")
-	if not hub_enabled() or not settings.auto_create_project_channel:
-		return
-
+def create_project_channel(doc, workspace: str, channel_type: str = "Private"):
+	"""Create + link a Raven Channel for the Project: members from its users, plus the project bot."""
 	channel_name = doc.project_name
-	if frappe.db.exists(
-		"Raven Channel", {"workspace": settings.project_workspace, "channel_name": channel_name}
-	):
+	if frappe.db.exists("Raven Channel", {"workspace": workspace, "channel_name": channel_name}):
 		channel_name = f"{doc.project_name} {doc.name}"
 
 	channel = frappe.new_doc("Raven Channel")
 	channel.channel_name = channel_name
-	channel.type = settings.project_channel_type or "Private"
-	channel.workspace = settings.project_workspace
+	channel.type = channel_type
+	channel.workspace = workspace
 	channel.channel_description = _("Channel for Project {0}").format(doc.project_name)
 	channel.is_synced = 1
 	channel.linked_doctype = "Project"
@@ -35,6 +30,15 @@ def after_insert(doc, method):
 	doc.db_set("raven_project_bot", bot.name, update_modified=False)
 	if bot.raven_user:
 		channel.add_members([bot.raven_user])
+	return channel
+
+
+def after_insert(doc, method):
+	settings = frappe.get_single("Raven Settings")
+	if not hub_enabled() or not settings.auto_create_project_channel:
+		return
+
+	create_project_channel(doc, settings.project_workspace, settings.project_channel_type or "Private")
 
 
 def on_update(doc, method):

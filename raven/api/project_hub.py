@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+from raven.raven_integrations.controllers.project import create_project_channel
 from raven.raven_integrations.project.github import REPO_PATTERN, list_available_repos
 from raven.raven_integrations.project.utils import channel_for_project, project_for_channel
 
@@ -77,6 +78,20 @@ def link_project(project: str, channel_id: str | None = None, workspace: str | N
 		doc = frappe.get_doc("Raven Workspace", workspace)
 		doc.linked_project = project
 		doc.save()
+
+
+@frappe.whitelist(methods=["POST"])
+def create_channel_for_project(project: str, workspace: str) -> str:
+	"""Project Hub → Channel tab: create a channel for a project that has none, in the current workspace."""
+	doc = frappe.get_doc("Project", project)
+	doc.check_permission("read")
+	frappe.has_permission("Raven Channel", "create", throw=True)
+	frappe.has_permission("Raven Workspace", "read", workspace, throw=True)
+
+	existing = channel_for_project(project)
+	if existing:
+		return existing
+	return create_project_channel(doc, workspace).name
 
 
 @frappe.whitelist(methods=["POST"])
