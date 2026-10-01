@@ -163,6 +163,8 @@ def get_billing(project: str) -> dict:
 		"customer": customer,
 		"can_create_invoice": bool(frappe.has_permission("Sales Invoice", "create")),
 		"can_create_order": bool(frappe.has_permission("Sales Order", "create")),
+		"company": company,
+		"can_view_statement": bool(frappe.has_permission("GL Entry", "read") and frappe.has_permission("Report")),
 	}
 
 

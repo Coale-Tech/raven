@@ -1,0 +1,662 @@
+{#- CoaleTech print design system, extracted verbatim from the Invoice CoaleTech print format.
+    Used by Customer Statement; the Sales Invoice / Quotation / Sales Order formats still carry their own inlined copy. -#}
+<style>
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS — CoaleTech
+   ═══════════════════════════════════════════════════════ */
+:root {
+  --charcoal:        #1A1A1A;
+  --charcoal-light:  #4A4A4A;
+  --charcoal-lighter:#6A6A6A;
+  --stonegrey:       #B8B8B8;
+  --parchment:       #FAF8F2;
+  --soft:            #F4F3EF;
+  --gold:            #E8C547;
+  --gold-text:       #8A6E16;
+  --gold-subtle:     #FCF8EA;
+  --gold-border:     #F1E3A0;
+  --border:          #E5E5E5;
+  --secondary:       #F5F5F5;
+  --muted-fg:        #737373;
+  --white:           #FFFFFF;
+  --success-fg:      #15803D;
+  --success-bg:      #F0FDF4;
+  --warning-fg:      #B45309;
+  --warning-bg:      #FFFBEB;
+  --danger-fg:       #B91C1C;
+  --danger-bg:       #FEF2F2;
+
+  --sans:    "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Space Grotesk", "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+
+  --radius:    8px;
+  --radius-md: 6px;
+  --radius-sm: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  font-family: var(--sans);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--charcoal);
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+.inv p { margin: 1px 0; }
+
+.inv h1, .inv h2, .inv h3 {
+  font-family: var(--display);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+/* Mono eyebrow — the DS label idiom (font-mono, uppercase, 0.12em tracking) */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--charcoal-light);
+}
+
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BRAND BAR — DS .coale-bar, charcoal | stonegrey
+   ═══════════════════════════════════════════════════════ */
+.ct-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--charcoal) 0 50%, var(--stonegrey) 50% 100%);
+}
+
+/* ═══════════════════════════════════════════════════════
+   RUNNING HEAD — #header-html, stamped on every page
+   ═══════════════════════════════════════════════════════ */
+.rh-line {
+  display: table;
+  width: 100%;
+  margin-top: 2mm;
+  font-family: var(--mono);
+  font-size: 7.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--charcoal-lighter);
+}
+
+.rh-line .rh-l, .rh-line .rh-r { display: table-cell; vertical-align: bottom; }
+.rh-line .rh-r { text-align: right; color: var(--charcoal); }
+
+/* ═══════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════ */
+.hd { display: table; width: 100%; }
+.hd-logo, .hd-co { display: table-cell; vertical-align: middle; }
+.hd-logo { width: 52mm; }
+.hd-co   { text-align: right; }
+
+.hd-logo img {
+  max-height: 16mm;
+  max-width: 50mm;
+  width: auto;
+  height: auto;
+}
+
+.co-name {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0 0 2px;
+}
+
+.co-line { font-size: 9px; color: var(--charcoal-light); line-height: 1.45; }
+.co-line a { color: var(--charcoal-light); text-decoration: none; }
+
+.co-pin {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--charcoal);
+  margin-top: 2px;
+}
+
+.rule { height: 1px; background: var(--border); border: 0; margin: 3.5mm 0; }
+
+/* ═══════════════════════════════════════════════════════
+   DOCUMENT TITLE
+   ═══════════════════════════════════════════════════════ */
+.title-wrap { text-align: center; margin-bottom: 4mm; }
+
+.doc-title {
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--charcoal);
+  line-height: 1.2;
+}
+
+.title-accent {
+  width: 14mm;
+  height: 2px;
+  background: var(--gold);
+  margin: 1.5mm auto 0;
+  border-radius: 2px;
+}
+
+.title-note { font-size: 9px; color: var(--charcoal-light); margin-top: 1.5mm; }
+.title-note strong { font-family: var(--mono); color: var(--charcoal); font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════
+   CARDS
+   ═══════════════════════════════════════════════════════ */
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-hd {
+  padding: 5px 10px;
+  background: var(--soft);
+  border-bottom: 1px solid var(--border);
+}
+
+.card-hd.ink { background: var(--charcoal); border-bottom: 0; }
+.card-hd.ink .eyebrow { color: var(--stonegrey); }
+
+.card-body { padding: 8px 10px; }
+
+/* ═══════════════════════════════════════════════════════
+   INFO GRID — Bill-to + Meta
+   ═══════════════════════════════════════════════════════ */
+.info { display: table; width: 100%; table-layout: fixed; margin-bottom: 4mm; }
+.info-l, .info-r { display: table-cell; vertical-align: top; }
+.info-l { width: 54%; padding-right: 2mm; }
+.info-r { width: 46%; padding-left: 2mm; }
+
+.cust-name {
+  font-family: var(--display);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 2px;
+}
+
+.cust-addr { font-size: 9px; color: var(--charcoal-light); }
+.cust-addr p { margin: 0.5px 0; }
+
+.cust-pin {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--charcoal);
+  margin-top: 3px;
+}
+
+.inv-no {
+  display: table-cell;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--white);
+  vertical-align: middle;
+}
+
+.card-hd.ink .eyebrow { display: table-cell; vertical-align: middle; }
+.card-hd.ink .banner { display: table; width: 100%; }
+
+.kv { padding: 0 10px; }
+
+.kv-row {
+  padding: 3px 0;
+  border-bottom: 1px solid var(--secondary);
+  overflow: hidden;
+}
+.kv-row:last-child { border-bottom: 0; }
+
+.kv-row .k {
+  float: left;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-fg);
+  line-height: 1.9;
+}
+
+.kv-row .v {
+  float: right;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--charcoal);
+  text-align: right;
+  line-height: 1.9;
+}
+
+/* Status badges — DS success / warning / destructive / secondary */
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 7.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 1.5px 6px;
+  border-radius: var(--radius-sm);
+}
+.badge.paid    { background: var(--success-bg); color: var(--success-fg); }
+.badge.partial { background: var(--warning-bg); color: var(--warning-fg); }
+.badge.overdue { background: var(--danger-bg);  color: var(--danger-fg); }
+.badge.unpaid  { background: var(--secondary);  color: var(--charcoal-light); }
+
+/* ═══════════════════════════════════════════════════════
+   TABLES — items + payment history
+   ═══════════════════════════════════════════════════════ */
+.tbl {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.inv .tbl th, .inv .tbl td {
+  padding: 6px 8px !important;
+  vertical-align: middle !important;
+  font-size: 9.5px;
+  border: 0;
+  border-bottom: 1px solid var(--secondary);
+}
+
+.inv .tbl thead th {
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--white);
+  background: var(--charcoal);
+  border-bottom: 0;
+  white-space: nowrap;
+}
+
+.inv .tbl tbody tr:nth-child(even) td { background: var(--parchment); }
+.inv .tbl tbody tr:last-child td { border-bottom: 0; }
+.tbl tbody tr { page-break-inside: avoid; }
+.tbl thead { display: table-header-group; }
+
+.inv .tbl td.sr, .inv .tbl th.sr {
+  text-align: center;
+  font-family: var(--mono);
+  color: var(--charcoal-lighter);
+}
+
+.it-line {
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--charcoal);
+  white-space: pre-line;
+}
+.it-line p, .it-line div, .it-line .ql-editor { margin: 0 !important; padding: 0 !important; }
+.it-line ul, .it-line ol { margin: 0; padding-left: 14px; }
+
+.tax-code {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  color: var(--charcoal-light);
+  letter-spacing: 0.02em;
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOTALS
+   ═══════════════════════════════════════════════════════ */
+.totals-wrap { overflow: hidden; margin-top: 3mm; page-break-inside: avoid; }
+
+.totals { float: right; width: 72mm; border-collapse: collapse; }
+
+.inv .totals td {
+  padding: 4px 10px !important;
+  vertical-align: middle !important;
+  font-size: 9.5px;
+  border: 0;
+  border-top: 1px solid var(--secondary);
+}
+.inv .totals tr:first-child td { border-top: 0; }
+
+.inv .totals td:first-child { color: var(--charcoal-light); }
+
+.inv .totals td:last-child {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--charcoal);
+}
+
+.inv .totals tr.grand td {
+  background: var(--charcoal);
+  color: var(--white);
+  border: 0;
+  padding: 7px 10px !important;
+}
+.inv .totals tr.grand td:first-child {
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--white);
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.inv .totals tr.grand td:last-child {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--white);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.in-words {
+  clear: both;
+  text-align: right;
+  font-size: 8.5px;
+  font-style: italic;
+  color: var(--charcoal-lighter);
+  margin-top: 2mm;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BALANCE DUE — DS gold "subtle" surface
+   ═══════════════════════════════════════════════════════ */
+.due-wrap { overflow: hidden; margin-top: 2.5mm; }
+
+.due {
+  float: right;
+  background: var(--gold-subtle);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius);
+  padding: 5px 12px;
+}
+
+.due .k {
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold-text);
+  margin-right: 10px;
+}
+
+.due .v {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--charcoal);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SECTION HEADING
+   ═══════════════════════════════════════════════════════ */
+.sec {
+  margin: 5mm 0 2mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════════════════
+   CONTROL UNIT / KRA eTIMS
+   ═══════════════════════════════════════════════════════ */
+.cu { margin-top: 4mm; page-break-inside: avoid; }
+
+.cu-body { display: table; width: 100%; table-layout: fixed; }
+.cu-info, .cu-qr { display: table-cell; vertical-align: top; }
+.cu-info { width: 62%; padding: 8px 10px; }
+.cu-qr   { width: 38%; padding: 8px 10px; text-align: right; }
+
+.cu-row { margin: 2.5px 0; font-size: 9.5px; line-height: 1.5; }
+
+.cu-row .k {
+  display: inline-block;
+  min-width: 27mm;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-fg);
+}
+
+.cu-row .v {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: var(--charcoal);
+}
+
+.cu-note {
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  font-size: 8.5px;
+  font-weight: 500;
+}
+
+.qr-box {
+  display: inline-block;
+  width: 32mm;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2mm;
+  background: var(--white);
+  text-align: center;
+}
+
+.qr-box img { display: block; width: 28mm; height: 28mm; }
+
+.qr-cap {
+  display: block;
+  margin-top: 1.5mm;
+  font-family: var(--mono);
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--charcoal-lighter);
+}
+
+.qr-none {
+  display: inline-block;
+  width: 32mm;
+  padding: 8mm 2mm;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  font-size: 8.5px;
+  font-style: italic;
+  color: var(--muted-fg);
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PAY-TO / BANK DETAILS
+   ═══════════════════════════════════════════════════════ */
+.pay-grid { display: table; width: 100%; table-layout: fixed; }
+.pay-col { display: table-cell; vertical-align: top; width: 50%; padding-right: 4mm; }
+
+.pay-row { margin: 2px 0; overflow: hidden; }
+
+.pay-row .k {
+  float: left;
+  width: 26mm;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-fg);
+  line-height: 1.7;
+}
+
+.pay-row .v {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--charcoal);
+  line-height: 1.7;
+}
+
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 9.5px;
+  font-style: italic;
+  color: var(--muted-fg);
+}
+
+.terms-body { font-size: 9px; color: var(--charcoal-light); line-height: 1.55; }
+
+/* ═══════════════════════════════════════════════════════
+   SIGNATURES
+   ═══════════════════════════════════════════════════════ */
+.sig { display: table; width: 100%; margin-top: 9mm; page-break-inside: avoid; }
+.sig-cell { display: table-cell; width: 45%; vertical-align: bottom; }
+.sig-gap  { display: table-cell; width: 10%; }
+
+.sig-line {
+  border-top: 1px solid var(--stonegrey);
+  padding-top: 3px;
+  font-family: var(--mono);
+  font-size: 7.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--charcoal-lighter);
+}
+
+/* ═══════════════════════════════════════════════════════
+   PAGE GEOMETRY — A4, 10mm sides, 10mm top, 16mm bottom
+   ═══════════════════════════════════════════════════════ */
+/* frappe.utils.pdf.get_print_format_styles() only harvests a BARE
+   `.print-format` rule (never `.print-format x` or a nested/@media one) and
+   feeds margin-top/left/right + page-size straight to the chrome generator —
+   without this it forces 15mm sides (browser.py:258-262). Longhands only:
+   cssutils does not expand the `margin` shorthand, so a shorthand is ignored.
+   margin-bottom stays undeclared on purpose: the footer band IS the bottom
+   margin (16mm), and a real margin-bottom is applied INSIDE the band document
+   (browser.py:336) where it would shrink the footer out of view. */
+.print-format { margin-top: 10mm; margin-left: 10mm; margin-right: 10mm; }
+/* Those three are page options, not layout — keep the element itself flush.
+   A compound selector is invisible to get_print_format_styles, so this
+   override does not disturb the harvested values. */
+html body .print-format { margin: 0 !important; }
+
+/* A4 210mm − 2×10mm margin = 190mm of content, matching the reference layout. */
+.inv { max-width: 190mm; margin: 0 auto; }
+
+/* ═══════════════════════════════════════════════════════
+   PDF BANDS — #header-html / #footer-html geometry
+   ═══════════════════════════════════════════════════════ */
+/* Each band becomes its own Chrome document: chrome_pdf_header_footer.html
+   re-parents our children into body > .print-format > .wrapper, pads both 1mm,
+   and frappe sizes the band from the wrapper's measured height. That padding
+   overflows the band and pushes the content onto the band document's 2nd page,
+   which pdf_merge never stamps (it stamps pages[0]). So: zero the injected
+   padding and pin each band's height. Both bands must exist — with a footer
+   alone, pdf_merge skips _transform and stamps the footer *over* the body's
+   last 13mm instead of below it, and the page stops being A4.
+   .wrapper exists only in the band documents; :has() picks the right one. */
+body:has(> .print-format > .wrapper) { padding-top: 0 !important; }
+
+.print-format > .wrapper { padding: 0 !important; }
+/* Heights are in WHOLE PX on purpose. frappe measures the wrapper through
+   CDP DOM.getBoxModel (page.py:287), which returns an integer, and uses it as
+   the band document's paperHeight: a 16mm box measures 60.47px, is printed on
+   a 60px page, and the 0.47px remainder fragments the band onto a 2nd page —
+   which the 1:1 dynamic merge then stamps on the body's 2nd page (the footer
+   appears one page late, and the last page loses it). 60px = 15.9mm ≈ the
+   16mm bottom margin; 26px + the 10mm margin-top above = 16.9mm on top.
+   `overflow: hidden` is the guard: a long remark clips instead of
+   re-fragmenting the band. */
+.print-format > .wrapper:has(> .ct-bar) { height: 26px !important; overflow: hidden; }
+.print-format > .wrapper:has(> .ft-rule) {
+  height: 60px !important;
+  padding: 0 0 13px !important;
+  overflow: hidden;
+}
+
+/* Browser print (Ctrl+P / "Save as PDF") and the Desk preview.
+   browser.py runs prepare_header_footer() BEFORE setup_body_page(), so the
+   server-side generator has already extracted both band ids by the time the
+   body document renders — #footer-html therefore only exists when frappe is
+   NOT paginating, i.e. the on-screen preview and Chrome's own print dialog.
+   There Chrome cannot repeat a band per page, so instead of leaving the footer
+   stranded mid-sheet with the content flush to the paper edge: give the sheet
+   its own margins (padding, not @page margin — the dialog's "Margins: None"
+   overrides @page but not padding) and drop the footer to the bottom. */
+@page { size: A4; }
+
+.print-format:has(#footer-html) {
+  display: flex;
+  flex-direction: column;
+  /* 100vh = the printable page box, so this adapts to whatever margin the
+     print dialog uses; 62px is printview.html's .print-format-gutter padding. */
+  min-height: calc(100vh - 62px);
+  padding: 9mm 10mm !important;
+}
+.print-format:has(#footer-html) > #header-html { margin-bottom: 5mm; }
+/* printview.html's DOMContentLoaded script sets inline `margin-top: 20px` on
+   #footer-html; a non-important inline declaration loses to author !important. */
+.print-format:has(#footer-html) > #footer-html { margin-top: auto !important; padding-top: 6mm; }
+
+.ft-rule {
+  height: 2px;
+  background: linear-gradient(90deg, var(--charcoal) 0 50%, var(--stonegrey) 50% 100%);
+  margin-bottom: 3px;
+}
+
+.ft-grid { display: table; width: 100%; }
+.ft-l, .ft-r { display: table-cell; vertical-align: top; font-size: 8.5px; color: var(--charcoal-light); }
+.ft-r { text-align: right; }
+.ft-l p, .ft-r p { margin: 1px 0; }
+.ft-r a { color: var(--charcoal-light); text-decoration: none; }
+.ft-label {
+  font-family: var(--mono);
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--stonegrey);
+}
+.ft-page { font-family: var(--mono); font-size: 7.5px; color: var(--stonegrey); }
+/* Page numbers are stamped per page by clone_and_update() in the band
+   document. Browser print has no page count — and Chrome's own dialog can
+   print them — so drop the line there. */
+.print-format:has(#footer-html) .ft-page { display: none; }
+</style>

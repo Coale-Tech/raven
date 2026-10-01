@@ -55,6 +55,7 @@ extend_bootinfo = "raven.boot.boot_session"
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Customer": "public/js/customer.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -84,12 +85,14 @@ extend_bootinfo = "raven.boot.boot_session"
 # "methods": "raven.utils.jinja_methods",
 # "filters": "raven.utils.jinja_filters"
 # }
+jinja = {"methods": ["raven.raven_integrations.report.customer_statement.customer_statement.get_statement"]}
 
 # Installation
 # ------------
 
 # before_install = "raven.install.before_install"
 after_install = "raven.install.after_install"
+after_migrate = "raven.install.add_customer_statement_to_selling_sidebar"
 # after_sync = ""
 
 # Uninstallation

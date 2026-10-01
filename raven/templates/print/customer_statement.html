@@ -1,0 +1,202 @@
+{#- Customer Statement — CoaleTech print design system (same chrome as Invoice / Quotation / Sales Order).
+    Rendered as a Jinja print format on Customer; period and company arrive as URL params
+    (from_date / to_date / company) from the Customer Statement report's "Statement PDF" button.
+    Default: last 3 months. Header, footer, page bands and geometry all come from ds_style.html. -#}
+{% include "raven/templates/includes/print/ds_style.html" %}
+
+{% set st = get_statement(
+    customer=doc.name,
+    company=frappe.form_dict.company,
+    from_date=frappe.form_dict.from_date,
+    to_date=frappe.form_dict.to_date) %}
+{% set money = frappe.utils.fmt_money %}
+{% set fmt_date = frappe.utils.formatdate %}
+
+<div id="header-html">
+  <div class="ct-bar"></div>
+  <div class="rh-line">
+    <span class="rh-l">{{ st.company }}</span>
+    <span class="rh-r">Customer Statement {{ doc.name }}</span>
+  </div>
+</div>
+
+<div class="inv">
+
+  <div class="hd">
+    <div class="hd-logo">
+      <img src="/files/CoaleTech_Modern_Transparent.png" alt="CoaleTech">
+    </div>
+    <div class="hd-co">
+      <h1 class="co-name">{{ st.company }}</h1>
+      <div class="co-line">
+        {% set addr_name = frappe.db.get_value("Dynamic Link",
+             {"link_doctype": "Company", "link_name": st.company, "parenttype": "Address"}, "parent") %}
+        {% set a = frappe.db.get_value("Address", addr_name,
+             ["address_line1", "address_line2", "city", "country"], as_dict=True) if addr_name else None %}
+        {% if a %}
+        {% set locality = [a.address_line2, [a.city, a.country] | select | join(", ")] | select | join(" &nbsp;·&nbsp; ") %}
+        {% if a.address_line1 %}<p>{{ a.address_line1 }}</p>{% endif %}
+        {% if locality %}<p>{{ locality }}</p>{% endif %}
+        {% endif %}
+        <p>+254 712 399 786 &nbsp;·&nbsp; +254 726 984 189</p>
+        <p>info&#64;coale.tech &nbsp;·&nbsp; <a href="https://home.coale.tech">home.coale.tech</a></p>
+      </div>
+      {% set co_pin = frappe.db.get_value("Company", st.company, "tax_id") %}
+      {% if co_pin %}<div class="co-pin">KRA PIN {{ co_pin }}</div>{% endif %}
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <div class="title-wrap">
+    <div class="doc-title">Customer Statement</div>
+    <div class="title-accent"></div>
+    <div class="title-note"><strong>{{ fmt_date(st.from_date) }}</strong> to <strong>{{ fmt_date(st.to_date) }}</strong></div>
+  </div>
+
+  <div class="info">
+    <div class="info-l">
+      <div class="card">
+        <div class="card-hd"><span class="eyebrow">Statement For</span></div>
+        <div class="card-body">
+          <h2 class="cust-name">{{ st.party.customer_name }}</h2>
+          <div class="cust-addr">
+            {{ st.party.address or "" }}
+            {% if st.party.email_id %}<p>{{ st.party.email_id }}</p>{% endif %}
+            {% if st.party.mobile_no %}<p>{{ st.party.mobile_no }}</p>{% endif %}
+          </div>
+          <div class="cust-pin">KRA PIN {{ st.party.tax_id or "—" }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-r">
+      <div class="card">
+        <div class="card-hd ink">
+          <div class="banner">
+            <span class="eyebrow">Account</span>
+            <span class="inv-no">{{ doc.name }}</span>
+          </div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">Opening Balance</span><span class="v">{{ money(st.opening, currency=st.currency) }}</span></div>
+          <div class="kv-row"><span class="k">Invoiced</span><span class="v">{{ money(st.total_debit, currency=st.currency) }}</span></div>
+          <div class="kv-row"><span class="k">Received</span><span class="v">{{ money(st.total_credit, currency=st.currency) }}</span></div>
+          <div class="kv-row">
+            <span class="k">Status</span>
+            <span class="v">
+              {% if st.closing <= 0 %}<span class="badge paid">Settled</span>
+              {% elif st.ageing[1:] | map(attribute=1) | sum > 0 %}<span class="badge overdue">Overdue</span>
+              {% else %}<span class="badge unpaid">Balance Due</span>{% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table class="tbl">
+    <colgroup>
+      <col style="width:12%"><col style="width:13%"><col style="width:23%"><col style="width:12%">
+      <col style="width:14%"><col style="width:13%"><col style="width:13%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Date</th><th>Type</th><th>Reference</th><th>Due</th>
+        <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in st.rows %}
+      <tr{% if not r.reference %} style="font-weight:600"{% endif %}>
+        <td>{{ fmt_date(r.date) }}</td>
+        <td>{{ r.type }}</td>
+        <td class="tax-code">{{ r.reference or "" }}</td>
+        <td>{{ fmt_date(r.due_date) if r.due_date else "" }}</td>
+        <td class="num">{{ money(r.debit, currency=st.currency) if r.debit else "" }}</td>
+        <td class="num">{{ money(r.credit, currency=st.currency) if r.credit else "" }}</td>
+        <td class="num">{{ money(r.balance, currency=st.currency) if r.balance is not none else "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="totals-wrap">
+    <table class="totals">
+      <tr><td>Total Invoiced</td><td>{{ money(st.total_debit, currency=st.currency) }}</td></tr>
+      <tr><td>Total Received</td><td>{{ money(st.total_credit, currency=st.currency) }}</td></tr>
+      <tr class="grand"><td>Balance Due</td><td>{{ money(st.closing, currency=st.currency) }}</td></tr>
+    </table>
+  </div>
+
+  <div class="sec"><span class="eyebrow">Ageing as at {{ fmt_date(st.to_date) }}</span></div>
+  <table class="tbl">
+    <thead>
+      <tr>
+        {% for label, amount in st.ageing %}<th class="num">{{ label }} days</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        {% for label, amount in st.ageing %}<td class="num">{{ money(amount, currency=st.currency) }}</td>{% endfor %}
+      </tr>
+    </tbody>
+  </table>
+
+  {% set bank = frappe.db.get_value("Bank Account",
+      {"company": st.company, "is_company_account": 1},
+      ["account_name", "bank", "bank_account_no", "branch_code", "iban"], as_dict=True) %}
+  {% if bank %}
+  <div class="sec"><span class="eyebrow">Pay To</span></div>
+  <div class="pay-grid">
+    <div class="pay-col">
+      {% if bank.bank %}<div class="pay-row"><span class="k">Bank</span><span class="v">{{ bank.bank }}</span></div>{% endif %}
+      {% if bank.account_name %}<div class="pay-row"><span class="k">Account Name</span><span class="v">{{ bank.account_name }}</span></div>{% endif %}
+    </div>
+    <div class="pay-col">
+      {% if bank.bank_account_no %}<div class="pay-row"><span class="k">Account No</span><span class="v">{{ bank.bank_account_no }}</span></div>{% endif %}
+      {% if bank.branch_code %}<div class="pay-row"><span class="k">Branch Code</span><span class="v">{{ bank.branch_code }}</span></div>{% endif %}
+      {% if bank.iban %}<div class="pay-row"><span class="k">IBAN</span><span class="v">{{ bank.iban }}</span></div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<div id="footer-html">
+  <div class="ft-rule"></div>
+  <div class="ft-grid">
+    <div class="ft-l">
+      <p class="ft-label">Statement</p>
+      <p>Please settle the balance due and send remittance advice to info&#64;coale.tech.</p>
+    </div>
+    <div class="ft-r">
+      <p>+254 712 399 786 &nbsp;·&nbsp; info&#64;coale.tech</p>
+      <p><a href="https://home.coale.tech">home.coale.tech</a></p>
+      <p class="ft-page">Page <span class="page">1</span> of <span class="topage">1</span></p>
+    </div>
+  </div>
+  <script>
+    /* Same per-page stamp as the Invoice CoaleTech footer band (print_designer is not installed). */
+    function clone_and_update(selector, total_pages, is_print_designer, type, update) {
+      const first = document.querySelector(selector);
+      if (!first || !total_pages) return Promise.resolve(0);
+      const stamp = (root, page) => {
+        const put = (cls, value) =>
+          root.querySelectorAll("." + cls + ", .page_info_" + cls).forEach((el) => {
+            el.textContent = value;
+          });
+        put("page", page);
+        put("topage", total_pages);
+        put("frompage", 1);
+      };
+      stamp(first, 1);
+      for (let page = 2; page <= total_pages; page++) {
+        const copy = first.cloneNode(true);
+        stamp(copy, page);
+        first.parentNode.appendChild(copy);
+      }
+      return Promise.resolve(total_pages);
+    }
+  </script>
+</div>

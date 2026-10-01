@@ -1,5 +1,5 @@
 import { useFrappeGetCall } from "frappe-react-sdk"
-import { PlusIcon } from "lucide-react"
+import { FileTextIcon, PlusIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
 import ErrorBanner from "@components/ui/error-banner"
@@ -41,8 +41,10 @@ type Billing = {
     orders: Order[] | null
     currency: string | null
     customer: string | null
+    company: string | null
     can_create_invoice: boolean
     can_create_order: boolean
+    can_view_statement: boolean
 }
 
 /** Opens a Desk "new document" form pre-filled via Frappe's URL-query route_options convention. */
@@ -70,7 +72,7 @@ export default function BillingTab({ project }: { project: string }) {
     if (error) return <ErrorBanner error={error} />
     if (!data) return null
 
-    const { totals, invoices, orders, currency, customer, can_create_invoice, can_create_order } = data.message
+    const { totals, invoices, orders, currency, customer, company, can_create_invoice, can_create_order, can_view_statement } = data.message
     const format = (amount: number | null) =>
         new Intl.NumberFormat(undefined, { style: "currency", currency: currency ?? "USD" }).format(amount ?? 0)
 
@@ -85,6 +87,23 @@ export default function BillingTab({ project }: { project: string }) {
 
     return (
         <div className="flex flex-col gap-6">
+            {can_view_statement && customer && (
+                <div className="flex justify-end">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                            window.open(
+                                `/app/query-report/Customer%20Statement?${new URLSearchParams({ customer, ...(company ? { company } : {}) })}`,
+                                "_blank",
+                            )
+                        }
+                    >
+                        <FileTextIcon />
+                        {_("Customer Statement")}
+                    </Button>
+                </div>
+            )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {stats.map((stat) => (
                     <div key={stat.label} className="rounded-md border border-outline-gray-2 p-3">
