@@ -1,14 +1,16 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useFrappeGetCall } from "frappe-react-sdk"
 import type { ColumnDef } from "@tanstack/react-table"
-import { CircleAlertIcon } from "lucide-react"
+import { CircleAlertIcon, PlusIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
+import { Button } from "@components/ui/button"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@components/ui/empty"
 import ErrorBanner from "@components/ui/error-banner"
 import { ListView, type ListViewColumnMeta } from "@components/ui/list-view"
 import { Spinner } from "@components/ui/spinner"
 import { formatDate } from "@lib/date"
 import _ from "@lib/translate"
+import CreateIssueDialog from "./CreateIssueDialog"
 
 type ProjectIssue = {
     name: string
@@ -26,14 +28,22 @@ const STATUS_THEME: Record<string, "gray" | "blue" | "green" | "amber" | "red"> 
     Closed: "gray",
 }
 
-/** Project Hub → Issues: support Issues linked to the Project. */
+type IssueOptions = { can_create: boolean; priorities: string[]; issue_types: string[] }
+
+/** Project Hub → Issues: support Issues linked to the Project, with an in-app "New issue" form. */
 export default function IssuesTab({ project }: { project: string }) {
-    const { data, error } = useFrappeGetCall<{ message: ProjectIssue[] }>(
+    const { data, error, mutate } = useFrappeGetCall<{ message: ProjectIssue[] }>(
         "raven.api.project_tabs.get_issues",
         { project },
         ["project_issues", project],
     )
     const issues = data?.message ?? []
+    const { data: options } = useFrappeGetCall<{ message: IssueOptions }>(
+        "raven.api.project_tabs.get_issue_options",
+        { project },
+        ["project_issue_options", project],
+    )
+    const [creating, setCreating] = useState(false)
 
     const columns = useMemo<ColumnDef<ProjectIssue>[]>(
         () => [
@@ -95,19 +105,44 @@ export default function IssuesTab({ project }: { project: string }) {
     }
     if (error) return <ErrorBanner error={error} />
 
-    if (issues.length === 0) {
-        return (
-            <Empty>
-                <EmptyHeader>
-                    <EmptyMedia>
-                        <CircleAlertIcon />
-                    </EmptyMedia>
-                    <EmptyTitle>{_("No issues")}</EmptyTitle>
-                    <EmptyDescription>{_("Support issues linked to this project will show up here.")}</EmptyDescription>
-                </EmptyHeader>
-            </Empty>
-        )
-    }
+    const newIssueButton = options?.message.can_create && (
+        <Button variant="outline" size="sm" onClick={() => setCreating(true)}>
+            <PlusIcon />
+            {_("New issue")}
+        </Button>
+    )
 
-    return <ListView data={issues} columns={columns} getRowId={(row) => row.name} maxHeight="100%" rowHeight={44} />
+    return (
+        <div className="flex h-full flex-col gap-3">
+            {issues.length > 0 && newIssueButton && <div className="flex justify-end">{newIssueButton}</div>}
+            {issues.length === 0 ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyMedia>
+                            <CircleAlertIcon />
+                        </EmptyMedia>
+                        <EmptyTitle>{_("No issues")}</EmptyTitle>
+                        <EmptyDescription>
+                            {_("Support issues linked to this project will show up here.")}
+                        </EmptyDescription>
+                    </EmptyHeader>
+                    {newIssueButton}
+                </Empty>
+            ) : (
+                <div className="min-h-0 flex-1">
+                    <ListView data={issues} columns={columns} getRowId={(row) => row.name} maxHeight="100%" rowHeight={44} />
+                </div>
+            )}
+            {creating && options && (
+                <CreateIssueDialog
+                    project={project}
+                    priorities={options.message.priorities}
+                    issueTypes={options.message.issue_types}
+                    open
+                    onOpenChange={(open) => !open && setCreating(false)}
+                    onCreated={mutate}
+                />
+            )}
+        </div>
+    )
 }

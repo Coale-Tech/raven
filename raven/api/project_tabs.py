@@ -181,6 +181,43 @@ def get_issues(project: str) -> list[dict]:
 
 
 @frappe.whitelist()
+def get_issue_options(project: str) -> dict:
+	_check(project)
+	return {
+		"can_create": bool(frappe.has_permission("Issue", "create")),
+		"priorities": frappe.get_all("Issue Priority", pluck="name", order_by="creation"),
+		"issue_types": frappe.get_all("Issue Type", pluck="name", order_by="name"),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def create_issue(
+	project: str,
+	subject: str,
+	priority: str | None = None,
+	issue_type: str | None = None,
+	description: str | None = None,
+) -> str:
+	_check(project)
+	frappe.has_permission("Issue", "create", throw=True)
+	company, customer = frappe.db.get_value("Project", project, ["company", "customer"])
+	doc = frappe.get_doc(
+		{
+			"doctype": "Issue",
+			"project": project,
+			"subject": subject,
+			"priority": priority or None,
+			"issue_type": issue_type or None,
+			"company": company,
+			"customer": customer,
+			"description": frappe.utils.escape_html(description).replace("\n", "<br>") if description else None,
+		}
+	)
+	doc.insert()
+	return doc.name
+
+
+@frappe.whitelist()
 def get_changelog(project: str) -> list[dict]:
 	_check(project)
 	repos = [row.repository for row in frappe.get_doc("Project", project).raven_github_repos]
