@@ -1,7 +1,8 @@
-{#- Customer Statement — CoaleTech print design system (same chrome as Invoice / Quotation / Sales Order).
+{#- Customer Statement — layout of the Prime Tyre / Vigilant statement (issuer + title head, three info boxes,
+    flat ledger, ageing beside payment details, closing note) in the CoaleTech palette and page chrome.
     Rendered as a Jinja print format on Customer; period and company arrive as URL params
     (from_date / to_date / company) from the Customer Statement report's "Statement PDF" button.
-    Default: last 3 months. Header, footer, page bands and geometry all come from ds_style.html. -#}
+    Default: last 3 months. Header band, footer band, fonts and page geometry come from ds_style.html. -#}
 {% include "raven/templates/includes/print/ds_style.html" %}
 
 {% set st = get_statement(
@@ -20,148 +21,178 @@
   </div>
 </div>
 
-<div class="inv">
+<div class="inv st">
 
-  <div class="hd">
-    <div class="hd-logo">
-      <img src="/files/CoaleTech_Modern_Transparent.png" alt="CoaleTech">
-    </div>
-    <div class="hd-co">
-      <h1 class="co-name">{{ st.company }}</h1>
-      <div class="co-line">
-        {% set addr_name = frappe.db.get_value("Dynamic Link",
-             {"link_doctype": "Company", "link_name": st.company, "parenttype": "Address"}, "parent") %}
-        {% set a = frappe.db.get_value("Address", addr_name,
-             ["address_line1", "address_line2", "city", "country"], as_dict=True) if addr_name else None %}
-        {% if a %}
-        {% set locality = [a.address_line2, [a.city, a.country] | select | join(", ")] | select | join(" &nbsp;·&nbsp; ") %}
-        {% if a.address_line1 %}<p>{{ a.address_line1 }}</p>{% endif %}
-        {% if locality %}<p>{{ locality }}</p>{% endif %}
-        {% endif %}
-        <p>+254 712 399 786 &nbsp;·&nbsp; +254 726 984 189</p>
-        <p>info&#64;coale.tech &nbsp;·&nbsp; <a href="https://home.coale.tech">home.coale.tech</a></p>
-      </div>
-      {% set co_pin = frappe.db.get_value("Company", st.company, "tax_id") %}
-      {% if co_pin %}<div class="co-pin">KRA PIN {{ co_pin }}</div>{% endif %}
-    </div>
+  <div class="st-head">
+    <table class="st-layout"><tr>
+      <td class="st-issuer">
+        <img class="st-logo" src="/files/CoaleTech_Modern_Transparent.png" alt="CoaleTech">
+        <div class="st-issuer-name">{{ st.company }}</div>
+        {% set co_pin = frappe.db.get_value("Company", st.company, "tax_id") %}
+        {% if co_pin %}<div class="st-issuer-pin">KRA PIN {{ co_pin }}</div>{% endif %}
+      </td>
+      <td class="st-title-cell">
+        <div class="st-title">Statement of Account</div>
+        <div class="st-subtitle">as at {{ fmt_date(st.to_date) }}</div>
+      </td>
+    </tr></table>
   </div>
 
-  <hr class="rule">
-
-  <div class="title-wrap">
-    <div class="doc-title">Customer Statement</div>
-    <div class="title-accent"></div>
-    <div class="title-note"><strong>{{ fmt_date(st.from_date) }}</strong> to <strong>{{ fmt_date(st.to_date) }}</strong></div>
+  <div class="st-boxes">
+    <table class="st-layout"><tr>
+      <td class="st-box-cell">
+        <div class="st-box">
+          <div class="st-box-title">Customer</div>
+          <div class="st-box-body">
+            <strong>{{ st.party.customer_name }}</strong>
+            {% if st.party.tax_id %}<div><span class="st-tag">PIN</span> {{ st.party.tax_id }}</div>{% endif %}
+            {% if st.party.mobile_no %}<div><span class="st-tag">TEL</span> {{ st.party.mobile_no }}</div>{% endif %}
+            {% if st.party.email_id %}<div><span class="st-tag">EMAIL</span> {{ st.party.email_id }}</div>{% endif %}
+          </div>
+        </div>
+      </td>
+      <td class="st-box-cell">
+        <div class="st-box">
+          <div class="st-box-title">Statement Period</div>
+          <div class="st-box-body"><strong>{{ fmt_date(st.from_date) }} &ndash; {{ fmt_date(st.to_date) }}</strong></div>
+        </div>
+      </td>
+      <td class="st-box-cell">
+        <div class="st-box st-box-due">
+          <div class="st-box-title">Amount Due</div>
+          <div class="st-due-amount">{{ money(st.closing, currency=st.currency) }}</div>
+        </div>
+      </td>
+    </tr></table>
   </div>
 
-  <div class="info">
-    <div class="info-l">
-      <div class="card">
-        <div class="card-hd"><span class="eyebrow">Statement For</span></div>
-        <div class="card-body">
-          <h2 class="cust-name">{{ st.party.customer_name }}</h2>
-          <div class="cust-addr">
-            {{ st.party.address or "" }}
-            {% if st.party.email_id %}<p>{{ st.party.email_id }}</p>{% endif %}
-            {% if st.party.mobile_no %}<p>{{ st.party.mobile_no }}</p>{% endif %}
-          </div>
-          <div class="cust-pin">KRA PIN {{ st.party.tax_id or "—" }}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="info-r">
-      <div class="card">
-        <div class="card-hd ink">
-          <div class="banner">
-            <span class="eyebrow">Account</span>
-            <span class="inv-no">{{ doc.name }}</span>
-          </div>
-        </div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">Opening Balance</span><span class="v">{{ money(st.opening, currency=st.currency) }}</span></div>
-          <div class="kv-row"><span class="k">Invoiced</span><span class="v">{{ money(st.total_debit, currency=st.currency) }}</span></div>
-          <div class="kv-row"><span class="k">Received</span><span class="v">{{ money(st.total_credit, currency=st.currency) }}</span></div>
-          <div class="kv-row">
-            <span class="k">Status</span>
-            <span class="v">
-              {% if st.closing <= 0 %}<span class="badge paid">Settled</span>
-              {% elif st.ageing[1:] | map(attribute=1) | sum > 0 %}<span class="badge overdue">Overdue</span>
-              {% else %}<span class="badge unpaid">Balance Due</span>{% endif %}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <table class="tbl">
-    <colgroup>
-      <col style="width:12%"><col style="width:13%"><col style="width:23%"><col style="width:12%">
-      <col style="width:14%"><col style="width:13%"><col style="width:13%">
-    </colgroup>
+  <table class="st-ledger">
     <thead>
       <tr>
-        <th>Date</th><th>Type</th><th>Reference</th><th>Due</th>
-        <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>
+        <th>Date</th><th>Reference</th><th>Type</th><th>Due Date</th>
+        <th class="st-num">Debit</th><th class="st-num">Credit</th><th class="st-num">Balance</th>
       </tr>
     </thead>
     <tbody>
       {% for r in st.rows %}
-      <tr{% if not r.reference %} style="font-weight:600"{% endif %}>
-        <td>{{ fmt_date(r.date) }}</td>
-        <td>{{ r.type }}</td>
-        <td class="tax-code">{{ r.reference or "" }}</td>
-        <td>{{ fmt_date(r.due_date) if r.due_date else "" }}</td>
-        <td class="num">{{ money(r.debit, currency=st.currency) if r.debit else "" }}</td>
-        <td class="num">{{ money(r.credit, currency=st.currency) if r.credit else "" }}</td>
-        <td class="num">{{ money(r.balance, currency=st.currency) if r.balance is not none else "" }}</td>
+      <tr{% if not r.reference %} class="st-edge"{% endif %}>
+        <td class="st-nw">{{ fmt_date(r.date) }}</td>
+        <td class="st-nw st-ref">{{ r.reference or "" }}</td>
+        <td class="st-nw">{{ r.type }}</td>
+        <td class="st-nw">{{ fmt_date(r.due_date) if r.due_date else "" }}</td>
+        <td class="st-num">{{ money(r.debit, currency=st.currency) if r.debit else "" }}</td>
+        <td class="st-num">{{ money(r.credit, currency=st.currency) if r.credit else "" }}</td>
+        <td class="st-num st-balance">{{ money(r.balance, currency=st.currency) if r.balance is not none else "" }}</td>
       </tr>
       {% endfor %}
-    </tbody>
-  </table>
-
-  <div class="totals-wrap">
-    <table class="totals">
-      <tr><td>Total Invoiced</td><td>{{ money(st.total_debit, currency=st.currency) }}</td></tr>
-      <tr><td>Total Received</td><td>{{ money(st.total_credit, currency=st.currency) }}</td></tr>
-      <tr class="grand"><td>Balance Due</td><td>{{ money(st.closing, currency=st.currency) }}</td></tr>
-    </table>
-  </div>
-
-  <div class="sec"><span class="eyebrow">Ageing as at {{ fmt_date(st.to_date) }}</span></div>
-  <table class="tbl">
-    <thead>
-      <tr>
-        {% for label, amount in st.ageing %}<th class="num">{{ label }} days</th>{% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        {% for label, amount in st.ageing %}<td class="num">{{ money(amount, currency=st.currency) }}</td>{% endfor %}
-      </tr>
     </tbody>
   </table>
 
   {% set bank = frappe.db.get_value("Bank Account",
       {"company": st.company, "is_company_account": 1},
       ["account_name", "bank", "bank_account_no", "branch_code", "iban"], as_dict=True) %}
-  {% if bank %}
-  <div class="sec"><span class="eyebrow">Pay To</span></div>
-  <div class="pay-grid">
-    <div class="pay-col">
-      {% if bank.bank %}<div class="pay-row"><span class="k">Bank</span><span class="v">{{ bank.bank }}</span></div>{% endif %}
-      {% if bank.account_name %}<div class="pay-row"><span class="k">Account Name</span><span class="v">{{ bank.account_name }}</span></div>{% endif %}
-    </div>
-    <div class="pay-col">
-      {% if bank.bank_account_no %}<div class="pay-row"><span class="k">Account No</span><span class="v">{{ bank.bank_account_no }}</span></div>{% endif %}
-      {% if bank.branch_code %}<div class="pay-row"><span class="k">Branch Code</span><span class="v">{{ bank.branch_code }}</span></div>{% endif %}
-      {% if bank.iban %}<div class="pay-row"><span class="k">IBAN</span><span class="v">{{ bank.iban }}</span></div>{% endif %}
-    </div>
+  <table class="st-layout st-bottom"><tr>
+    <td class="st-aging-wrap"{% if not bank %} style="width:100%;padding-right:0 !important"{% endif %}>
+      <div class="st-section">Ageing of Amount Due</div>
+      <table class="st-aging">
+        <thead>
+          <tr>
+            <th>0-30 Days</th><th>31-60 Days</th><th>61-90 Days</th><th>91+ Days</th>
+            <th>Credits on Account</th><th class="st-aging-total">Total Due</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="st-num">{{ money(st.ageing[0][1], currency=st.currency) }}</td>
+            <td class="st-num">{{ money(st.ageing[1][1], currency=st.currency) }}</td>
+            <td class="st-num">{{ money(st.ageing[2][1], currency=st.currency) }}</td>
+            <td class="st-num">{{ money(st.ageing[3:] | map(attribute=1) | sum, currency=st.currency) }}</td>
+            <td class="st-num">{{ money(st.credits, currency=st.currency) }}</td>
+            <td class="st-num st-aging-total">{{ money(st.closing, currency=st.currency) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </td>
+    <td class="st-pay-wrap">
+      {% if bank %}
+      <div class="st-section">Pay To</div>
+      <table class="st-pay">
+        {% if bank.bank %}<tr><td class="st-k">Bank</td><td>{{ bank.bank }}</td></tr>{% endif %}
+        {% if bank.account_name %}<tr><td class="st-k">Account Name</td><td>{{ bank.account_name }}</td></tr>{% endif %}
+        {% if bank.bank_account_no %}<tr><td class="st-k">Account No</td><td>{{ bank.bank_account_no }}</td></tr>{% endif %}
+        {% if bank.branch_code %}<tr><td class="st-k">Branch Code</td><td>{{ bank.branch_code }}</td></tr>{% endif %}
+        {% if bank.iban %}<tr><td class="st-k">IBAN</td><td>{{ bank.iban }}</td></tr>{% endif %}
+      </table>
+      {% endif %}
+    </td>
+  </tr></table>
+
+  <div class="st-note">
+    Please quote the invoice numbers above when making payment.<br>
+    Contact us within 7 days if any entry on this statement is disputed.
   </div>
-  {% endif %}
 
 </div>
+
+<style>
+  .st-layout { width: 100%; border-collapse: collapse; }
+  .st-layout > tbody > tr > td { padding: 0; vertical-align: top; border: 0; }
+
+  .st-head { border-bottom: 2px solid var(--gold); padding-bottom: 3mm; margin-bottom: 4mm; }
+  .st-issuer { width: 60%; vertical-align: middle !important; }
+  .st-logo { display: block; max-height: 14mm; max-width: 50mm; width: auto; height: auto; margin-bottom: 1.5mm; }
+  .st-issuer-name { font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: -0.02em; }
+  .st-issuer-pin { font-family: var(--mono); font-size: 8.5px; font-weight: 600; letter-spacing: 0.06em; color: var(--charcoal-light); }
+  .st-title-cell { width: 40%; text-align: right; vertical-align: middle !important; }
+  .st-title { font-family: var(--display); font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; text-transform: uppercase; }
+  .st-subtitle { font-family: var(--mono); font-size: 9px; color: var(--charcoal-lighter); margin-top: 1mm; }
+
+  .st-boxes { margin-bottom: 5mm; }
+  .st-box-cell { width: 33.33%; padding-right: 3mm !important; }
+  .st-box-cell:last-child { padding-right: 0 !important; }
+  .st-box { background: var(--parchment); border-left: 3px solid var(--gold); padding: 2mm 3mm; height: 100%; }
+  .st-box-due { background: var(--charcoal); border-left-color: var(--gold); color: var(--white); text-align: right; }
+  .st-box-title, .st-tag {
+    font-family: var(--mono); font-size: 7.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--charcoal-lighter);
+  }
+  .st-box-due .st-box-title { color: var(--stonegrey); }
+  .st-box-body { margin-top: 0.5mm; font-size: 9.5px; }
+  .st-due-amount { font-family: var(--mono); font-size: 16px; font-weight: 700; margin-top: 1mm; white-space: nowrap; }
+
+  .st-ledger, .st-aging { width: 100%; border-collapse: collapse; }
+  .st-ledger th, .st-ledger td, .st-aging th, .st-aging td, .st-pay td {
+    padding: 5px 6px !important; border: 0; border-bottom: 1px solid var(--border); font-size: 9.5px;
+  }
+  .st-ledger thead { display: table-header-group; }
+  .st-ledger tbody tr { page-break-inside: avoid; }
+  .st-ledger thead th {
+    font-family: var(--mono); font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--white); background: var(--charcoal) !important; text-align: left;
+  }
+  .st-num { text-align: right !important; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .st-nw { white-space: nowrap; }
+  .st-ref { font-family: var(--mono); font-size: 8.5px; color: var(--charcoal-light); }
+  .st-balance { font-weight: 600; }
+  .st-ledger tr.st-edge td { font-weight: 700; background: var(--gold-subtle); border-bottom-color: var(--gold-border); }
+
+  .st-bottom { margin-top: 6mm; page-break-inside: avoid; }
+  .st-aging-wrap { width: 62%; padding-right: 4mm !important; }
+  .st-pay-wrap { width: 38%; }
+  .st-section {
+    font-family: var(--mono); font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+    padding-bottom: 1mm; margin-bottom: 2mm; border-bottom: 2px solid var(--gold);
+  }
+  .st-aging thead th {
+    background: var(--parchment) !important; color: var(--charcoal-light); text-align: right;
+    font-family: var(--mono); font-size: 7.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .st-aging-total { font-weight: 700; border-left: 1px solid var(--border); }
+  .st-pay td { padding: 2px 4px !important; border: 0; }
+  .st-pay .st-k { font-family: var(--mono); font-size: 8px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--charcoal-lighter); white-space: nowrap; }
+
+  .st-note { margin-top: 5mm; padding-top: 2mm; border-top: 1px solid var(--border); font-size: 9px; color: var(--charcoal-light); }
+</style>
 
 <div id="footer-html">
   <div class="ft-rule"></div>

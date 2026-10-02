@@ -123,6 +123,8 @@ def get_statement(customer, company=None, from_date=None, to_date=None):
 		)
 	rows.append(_row(currency, date=to_date, type=_("Closing Balance"), balance=balance))
 
+	ageing, credits = _ageing(customer, company, to_date)
+
 	return {
 		"customer": customer,
 		"company": company,
@@ -134,7 +136,8 @@ def get_statement(customer, company=None, from_date=None, to_date=None):
 		"total_debit": total_debit,
 		"total_credit": total_credit,
 		"rows": rows,
-		"ageing": _ageing(customer, company, to_date),
+		"ageing": ageing,
+		"credits": credits,
 		"party": _party(customer),
 	}
 
@@ -165,7 +168,10 @@ def _voucher_label(voucher_type, debit, is_return):
 
 
 def _ageing(customer, company, to_date):
-	"""[(label, amount)] for the customer's open receivables, aged at `to_date` by due date."""
+	"""([(label, amount)], credits) for the customer's open receivables, aged at `to_date` by due date.
+
+	`credits` is unallocated payments, negative so buckets + credits = the ledger balance.
+	"""
 	_columns, data = receivable_summary(
 		{
 			"company": company,
@@ -181,7 +187,8 @@ def _ageing(customer, company, to_date):
 		}
 	)
 	row = data[0] if data else {}
-	return [(label, flt(row.get(f"range{i}"))) for i, label in enumerate(AGEING_LABELS, 1)]
+	buckets = [(label, flt(row.get(f"range{i}"))) for i, label in enumerate(AGEING_LABELS, 1)]
+	return buckets, -flt(row.get("advance")) or 0.0
 
 
 def _party(customer):
