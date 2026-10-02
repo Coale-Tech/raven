@@ -46,7 +46,7 @@ type Form = {
     description: string
 }
 
-const Field = ({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) => (
+export const Field = ({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) => (
     <div className="flex flex-col gap-1.5">
         <Label htmlFor={htmlFor}>{label}</Label>
         {children}
@@ -54,7 +54,7 @@ const Field = ({ label, htmlFor, children }: { label: string; htmlFor?: string; 
 )
 
 /** Picks several values from a link field: each pick becomes a removable chip. */
-function MultiLink({
+export function MultiLink({
     doctype,
     values,
     onChange,

@@ -26,6 +26,20 @@ TASK_CREATE_FIELDS = (
 	"description",
 )
 
+ISSUE_STATUSES = ("Open", "Replied", "On Hold", "Resolved", "Closed")
+ISSUE_CREATE_FIELDS = (
+	"status",
+	"priority",
+	"issue_type",
+	"customer",
+	"raised_by",
+	"description",
+	"service_level_agreement",
+	"lead",
+	"contact",
+	"email_account",
+)
+
 
 def _check(project: str) -> None:
 	frappe.has_permission("Project", "read", project, throw=True)
@@ -211,26 +225,30 @@ def get_issue_options(project: str) -> dict:
 def create_issue(
 	project: str,
 	subject: str,
-	priority: str | None = None,
-	issue_type: str | None = None,
-	description: str | None = None,
+	fields: dict | str | None = None,
+	assign_to: list | str | None = None,
 ) -> str:
+	"""Create an Issue; `fields` is limited to ISSUE_CREATE_FIELDS, `assign_to` is a list of users (ToDo + notification)."""
 	_check(project)
 	frappe.has_permission("Issue", "create", throw=True)
+	fields = frappe.parse_json(fields) or {}
+	if unknown := set(fields) - set(ISSUE_CREATE_FIELDS):
+		frappe.throw(_("Field(s) not allowed here: {0}").format(", ".join(sorted(unknown))))
+	if fields.get("status", "Open") not in ISSUE_STATUSES:
+		frappe.throw(_("Invalid status {0}").format(fields["status"]))
+	if fields.get("description"):
+		fields["description"] = frappe.utils.escape_html(fields["description"]).replace("\n", "<br>")
 	company, customer = frappe.db.get_value("Project", project, ["company", "customer"])
+
 	doc = frappe.get_doc(
-		{
-			"doctype": "Issue",
-			"project": project,
-			"subject": subject,
-			"priority": priority or None,
-			"issue_type": issue_type or None,
-			"company": company,
-			"customer": customer,
-			"description": frappe.utils.escape_html(description).replace("\n", "<br>") if description else None,
-		}
+		{"doctype": "Issue", "project": project, "subject": subject, "company": company, "customer": customer, **fields}
 	)
 	doc.insert()
+
+	if users := frappe.parse_json(assign_to):
+		from frappe.desk.form.assign_to import add
+
+		add({"doctype": "Issue", "name": doc.name, "assign_to": users})
 	return doc.name
 
 
