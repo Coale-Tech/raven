@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import cint
 from frappe.utils.html_utils import clean_html
 
 from raven.raven_integrations.project.github import fetch_changelog
@@ -125,26 +126,146 @@ def add_note(project: str, content: str) -> str:
 	return doc.add_comment("Comment", clean_html(content), comment_email=frappe.session.user).name
 
 
-@frappe.whitelist()
-def get_communications(project: str) -> list[dict]:
-	_check(project)
-	return frappe.get_all(
+def _emails(project: str, task: str | None, q: str | None, limit: int) -> list[dict]:
+	filters = {"reference_doctype": "Project", "reference_name": project}
+	if task:
+		filters["name"] = [
+			"in",
+			frappe.get_all(
+				"Communication Link",
+				filters={"parenttype": "Communication", "link_doctype": "Task", "link_name": task},
+				pluck="parent",
+			)
+			or [""],
+		]
+	rows = frappe.get_all(
 		"Communication",
-		filters={"reference_doctype": "Project", "reference_name": project},
+		filters=filters,
+		or_filters=[["subject", "like", f"%{q}%"], ["content", "like", f"%{q}%"]] if q else None,
 		fields=[
 			"name",
 			"subject",
 			"sender",
 			"sender_full_name",
 			"recipients",
+			"cc",
 			"communication_medium",
-			"sent_or_received",
-			"communication_date",
+			"sent_or_received as direction",
+			"communication_date as date",
 			"content",
 		],
 		order_by="communication_date desc",
-		limit=50,
+		limit=limit,
 	)
+	for row in rows:
+		row["kind"] = "email"
+	return rows
+
+
+def _whatsapps(project: str, customer_mobile: str | None, tasks: list[str], task: str | None, q: str | None, limit: int) -> list[dict]:
+	"""WhatsApp Messages sent about the project's tasks, plus the customer's own conversation (replies aren't linked to anything)."""
+	if "frappe_whatsapp" not in frappe.get_installed_apps() or not frappe.has_permission("WhatsApp Message", "read"):
+		return []
+
+	filters = {"message": ["like", f"%{q}%"]} if q else {}
+	or_filters = None
+	if task:
+		filters.update({"reference_doctype": "Task", "reference_name": task})
+	else:
+		or_filters = [["reference_name", "in", [*tasks, project]]]
+		if tail := "".join(c for c in customer_mobile or "" if c.isdigit())[-9:]:
+			or_filters += [["to", "like", f"%{tail}"], ["from", "like", f"%{tail}"]]
+
+	rows = frappe.get_all(
+		"WhatsApp Message",
+		filters=filters,
+		or_filters=or_filters,
+		fields=[
+			"name",
+			"type",
+			"status",
+			"to as recipients",
+			"from as sender",
+			"message as content",
+			"content_type",
+			"attach",
+			"creation as date",
+			"reference_doctype",
+			"reference_name",
+		],
+		order_by="creation desc",
+		limit=limit,
+	)
+	for row in rows:
+		row["kind"] = "whatsapp"
+		row["direction"] = "Sent" if row.pop("type") == "Outgoing" else "Received"
+		row["task"] = row["reference_name"] if row.pop("reference_doctype") == "Task" else None
+		row.pop("reference_name")
+	return rows
+
+
+@frappe.whitelist()
+def get_communications(
+	project: str,
+	kind: str | None = None,
+	task: str | None = None,
+	q: str | None = None,
+	start: int | str = 0,
+	page_length: int | str = 30,
+) -> dict:
+	"""Communication tab: emails logged on the Project and WhatsApp Messages about it, newest first.
+
+	`kind` is "email" or "whatsapp" (default both), `task` narrows to one Task, `q` searches subject/body.
+	"""
+	_check(project)
+	start, page_length = cint(start), min(cint(page_length) or 30, 500)
+	want = start + page_length + 1  # one extra row tells us whether there is another page
+
+	customer_name = frappe.db.get_value("Project", project, "customer")
+	customer = (
+		frappe.db.get_value("Customer", customer_name, ["name", "customer_name", "email_id", "mobile_no"], as_dict=True)
+		if customer_name
+		else None
+	)
+	tasks = frappe.get_all("Task", filters={"project": project}, fields=["name", "subject"], order_by="creation desc")
+	task_names = [t.name for t in tasks]
+
+	items = []
+	if kind != "whatsapp":
+		items += _emails(project, task, q, want)
+	if kind != "email":
+		items += _whatsapps(project, customer and customer.mobile_no, task_names, task, q, want)
+	items.sort(key=lambda i: str(i["date"]), reverse=True)
+	has_more = len(items) > start + page_length
+	items = items[start : start + page_length]
+
+	emails = [i["name"] for i in items if i["kind"] == "email"]
+	if emails:
+		files = frappe.get_all(
+			"File",
+			filters={"attached_to_doctype": "Communication", "attached_to_name": ["in", emails]},
+			fields=["attached_to_name", "file_name", "file_url"],
+		)
+		links = frappe.get_all(
+			"Communication Link",
+			filters={"parenttype": "Communication", "parent": ["in", emails], "link_doctype": "Task"},
+			fields=["parent", "link_name"],
+		)
+		for i in items:
+			if i["kind"] == "email":
+				i["attachments"] = [f for f in files if f.attached_to_name == i["name"]]
+				i["task"] = next((link.link_name for link in links if link.parent == i["name"]), None)
+	for i in items:
+		i.setdefault("attachments", [{"file_name": i["attach"].rsplit("/", 1)[-1], "file_url": i["attach"]}] if i.get("attach") else [])
+		i.pop("attach", None)
+
+	return {
+		"items": items,
+		"has_more": has_more,
+		"customer": customer,
+		"tasks": tasks,
+		"can_email": bool(frappe.has_permission("Project", "email", project)),
+	}
 
 
 @frappe.whitelist()

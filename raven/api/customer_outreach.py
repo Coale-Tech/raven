@@ -135,6 +135,58 @@ def set_task_customer_facing(task: str, value: int | str) -> None:
 	frappe.db.set_value("Task", task, MARKER, cint(value))
 
 
+def _send_email(
+	project: str,
+	recipients: str,
+	subject: str,
+	message: str,
+	cc: str | None = None,
+	attachments: list[str] | None = None,
+	in_reply_to: str | None = None,
+	task: str | None = None,
+) -> str:
+	"""Send a plain-text email logged on the Project (so the Communication tab shows it); `task` tags it to a Task."""
+	name = make(
+		doctype="Project",
+		name=project,
+		content=frappe.utils.escape_html(message).replace("\n", "<br>"),
+		subject=subject,
+		recipients=recipients,
+		cc=cc or None,
+		attachments=attachments or None,
+		in_reply_to=in_reply_to or None,
+		communication_medium="Email",
+		send_email=True,
+	)["name"]
+	if task:
+		frappe.get_doc("Communication", name).add_link("Task", task, autosave=True)
+	return name
+
+
+@frappe.whitelist(methods=["POST"])
+def send_project_email(
+	project: str,
+	recipients: str,
+	subject: str,
+	message: str,
+	cc: str | None = None,
+	attachments: list[str] | None = None,
+	in_reply_to: str | None = None,
+	task: str | None = None,
+) -> str:
+	"""Communication tab → "Send email" / "Reply": email anyone about a Project, optionally tagged to one of its Tasks."""
+	frappe.has_permission("Project", "email", project, throw=True)
+	if not (recipients or "").strip():
+		frappe.throw(_("Add at least one recipient"))
+	if not (message or "").strip():
+		frappe.throw(_("Write a message first"))
+	if task and frappe.db.get_value("Task", task, "project") != project:
+		frappe.throw(_("Task {0} does not belong to project {1}").format(task, project))
+	if in_reply_to and frappe.db.get_value("Communication", in_reply_to, "reference_name") != project:
+		frappe.throw(_("{0} is not a message of project {1}").format(in_reply_to, project))
+	return _send_email(project, recipients, subject, message.strip(), cc, attachments, in_reply_to, task)
+
+
 @frappe.whitelist(methods=["POST"])
 def send_to_customer(
 	task: str,
@@ -194,15 +246,7 @@ def send_to_customer(
 		wa_message.insert()
 		sent.append("WhatsApp")
 	if email:
-		make(
-			doctype="Project",
-			name=doc.project,
-			content=frappe.utils.escape_html(message).replace("\n", "<br>"),
-			subject=subject or doc.subject,
-			recipients=party.email_id,
-			communication_medium="Email",
-			send_email=True,
-		)
+		_send_email(doc.project, party.email_id, subject or doc.subject, message, task=task)
 		sent.append("Email")
 
 	quoted = "\n".join(f"> {line}" for line in message.splitlines())
