@@ -6,6 +6,25 @@ from raven.raven_integrations.project.github import fetch_changelog
 from raven.raven_integrations.project.drive import folder_for_project
 
 TASK_STATUSES = ("Open", "Working", "Pending Review", "Completed", "Cancelled")
+TASK_CREATE_FIELDS = (
+	"status",
+	"priority",
+	"type",
+	"color",
+	"parent_task",
+	"is_group",
+	"is_milestone",
+	"issue",
+	"department",
+	"exp_start_date",
+	"exp_end_date",
+	"expected_time",
+	"task_weight",
+	"progress",
+	"review_date",
+	"depends_on",
+	"description",
+)
 
 
 def _check(project: str) -> None:
@@ -35,30 +54,28 @@ def get_tasks(project: str) -> list[dict]:
 
 
 @frappe.whitelist(methods=["POST"])
-def create_task(
-	project: str,
-	subject: str,
-	priority: str = "Medium",
-	status: str = "Open",
-	exp_end_date: str | None = None,
-	description: str | None = None,
-) -> str:
+def create_task(project: str, subject: str, fields: dict | str | None = None, assign_to: list | str | None = None) -> str:
+	"""Create a Task; `fields` is limited to TASK_CREATE_FIELDS, `assign_to` is a list of users (ToDo + notification)."""
 	_check(project)
 	frappe.has_permission("Task", "create", throw=True)
-	if status not in TASK_STATUSES:
-		frappe.throw(_("Invalid status {0}").format(status))
+	fields = frappe.parse_json(fields) or {}
+	if unknown := set(fields) - set(TASK_CREATE_FIELDS):
+		frappe.throw(_("Field(s) not allowed here: {0}").format(", ".join(sorted(unknown))))
+	if fields.get("status", "Open") not in TASK_STATUSES:
+		frappe.throw(_("Invalid status {0}").format(fields["status"]))
+	if fields.get("description"):
+		fields["description"] = frappe.utils.escape_html(fields["description"]).replace("\n", "<br>")
+	depends_on = [{"task": t} for t in fields.pop("depends_on", None) or []]
+
 	doc = frappe.get_doc(
-		{
-			"doctype": "Task",
-			"project": project,
-			"subject": subject,
-			"priority": priority,
-			"status": status,
-			"exp_end_date": exp_end_date,
-			"description": description,
-		}
+		{"doctype": "Task", "project": project, "subject": subject, "depends_on": depends_on, **fields}
 	)
 	doc.insert()
+
+	if users := frappe.parse_json(assign_to):
+		from frappe.desk.form.assign_to import add
+
+		add({"doctype": "Task", "name": doc.name, "assign_to": users})
 	return doc.name
 
 
