@@ -92,7 +92,10 @@ jinja = {"methods": ["raven.raven_integrations.report.customer_statement.custome
 
 # before_install = "raven.install.before_install"
 after_install = "raven.install.after_install"
-after_migrate = "raven.install.add_customer_statement_to_selling_sidebar"
+after_migrate = [
+	"raven.install.add_customer_statement_to_selling_sidebar",
+	"raven.raven_integrations.project.setup.add_task_customer_facing_field",
+]
 # after_sync = ""
 
 # Uninstallation
@@ -154,6 +157,7 @@ doc_events = {
 		"on_update": "raven.raven_integrations.controllers.employee.on_update",
 		"on_trash": "raven.raven_integrations.controllers.employee.on_trash",
 	},
+	"Customer": {"on_trash": "raven.raven_integrations.controllers.customer.on_trash"},
 	"Project": {
 		"after_insert": "raven.raven_integrations.controllers.project.after_insert",
 		"on_update": "raven.raven_integrations.controllers.project.on_update",

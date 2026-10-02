@@ -1,6 +1,6 @@
 import { useMemo, useState, type DragEvent } from "react"
 import { useFrappeGetCall, useFrappePostCall, type FrappeError } from "frappe-react-sdk"
-import { PlusIcon } from "lucide-react"
+import { FlagIcon, PlusIcon, SendIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
 import ErrorBanner, { errorResponseToast } from "@components/ui/error-banner"
@@ -11,6 +11,7 @@ import { formatDate } from "@lib/date"
 import { cn } from "@lib/utils"
 import _ from "@lib/translate"
 import CreateTaskDialog from "./CreateTaskDialog"
+import SendToCustomerDialog from "./SendToCustomerDialog"
 
 type ProjectTask = {
     name: string
@@ -22,6 +23,7 @@ type ProjectTask = {
     _assign: string | null
     parent_task: string | null
     is_group: number
+    raven_customer_facing: number
 }
 
 const STATUS_OPTIONS = ["Open", "Working", "Pending Review", "Completed", "Cancelled"] as const
@@ -59,7 +61,14 @@ export default function TasksTab({ project }: { project: string }) {
             .then(() => mutate())
             .catch((e: FrappeError) => errorResponseToast(_("Could not update status"), e))
 
+    const { call: setCustomerFacing } = useFrappePostCall("raven.api.customer_outreach.set_task_customer_facing")
+    const onToggleCustomerFacing = (task: ProjectTask) =>
+        setCustomerFacing({ task: task.name, value: task.raven_customer_facing ? 0 : 1 })
+            .then(() => mutate())
+            .catch((e: FrappeError) => errorResponseToast(_("Could not update task"), e))
+
     const [addTaskStatus, setAddTaskStatus] = useState<string | null>(null)
+    const [sendTask, setSendTask] = useState<string | null>(null)
     const [dragOverStatus, setDragOverStatus] = useState<string | null>(null)
 
     const columns = useMemo(() => {
@@ -145,6 +154,32 @@ export default function TasksTab({ project }: { project: string }) {
                                                     {formatDate(task.exp_end_date)}
                                                 </span>
                                             )}
+                                            <div className="ml-auto flex items-center">
+                                                <Button
+                                                    variant="ghost"
+                                                    isIconButton
+                                                    size="sm"
+                                                    aria-pressed={!!task.raven_customer_facing}
+                                                    aria-label={_("Customer-facing")}
+                                                    title={_("Customer-facing")}
+                                                    className={task.raven_customer_facing ? "text-ink-blue-3" : undefined}
+                                                    onClick={() => onToggleCustomerFacing(task)}
+                                                >
+                                                    <FlagIcon className={task.raven_customer_facing ? "fill-current" : undefined} />
+                                                </Button>
+                                                {!!task.raven_customer_facing && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        isIconButton
+                                                        size="sm"
+                                                        aria-label={_("Send to customer")}
+                                                        title={_("Send to customer")}
+                                                        onClick={() => setSendTask(task.name)}
+                                                    >
+                                                        <SendIcon />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                         {task.progress > 0 && <Progress value={task.progress} size="sm" />}
                                         <Select value={task.status} onValueChange={(v) => onStatusChange(task.name, v)}>
@@ -178,6 +213,9 @@ export default function TasksTab({ project }: { project: string }) {
                     onOpenChange={(open) => !open && setAddTaskStatus(null)}
                     onCreated={mutate}
                 />
+            )}
+            {sendTask && (
+                <SendToCustomerDialog task={sendTask} open onOpenChange={(open) => !open && setSendTask(null)} />
             )}
         </div>
     )

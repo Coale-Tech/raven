@@ -3,6 +3,24 @@ from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 
+def add_task_customer_facing_field() -> None:
+	"""The marker that enables "Send to customer" on a Task. Idempotent; also runs on every migrate."""
+	create_custom_fields(
+		{
+			"Task": [
+				{
+					"fieldname": "raven_customer_facing",
+					"label": "Customer-facing",
+					"fieldtype": "Check",
+					"insert_after": "priority",
+					"description": "Allows emailing / WhatsApp-ing the project's customer from the Project Hub",
+				}
+			]
+		},
+		ignore_validate=True,
+	)
+
+
 def setup_project_hub(settings) -> None:
 	"""Idempotent one-time setup run when Project Hub is turned on."""
 	create_custom_fields(
@@ -29,6 +47,7 @@ def setup_project_hub(settings) -> None:
 		ignore_validate=True,
 	)
 
+	add_task_customer_facing_field()
 	_ensure_project_bot(settings)
 	_ensure_create_task_action()
 	_ensure_implementation_project_type()

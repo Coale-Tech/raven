@@ -24,6 +24,7 @@ TASK_CREATE_FIELDS = (
 	"review_date",
 	"depends_on",
 	"description",
+	"raven_customer_facing",
 )
 
 ISSUE_STATUSES = ("Open", "Replied", "On Hold", "Resolved", "Closed")
@@ -61,6 +62,7 @@ def get_tasks(project: str) -> list[dict]:
 			"_assign",
 			"parent_task",
 			"is_group",
+			"raven_customer_facing",
 		],
 		order_by="modified desc",
 		limit_page_length=200,

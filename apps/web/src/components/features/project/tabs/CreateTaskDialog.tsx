@@ -43,6 +43,7 @@ type Form = {
     color: string
     is_group: boolean
     is_milestone: boolean
+    raven_customer_facing: boolean
     description: string
 }
 
@@ -136,6 +137,7 @@ export default function CreateTaskDialog({
         color: "",
         is_group: false,
         is_milestone: false,
+        raven_customer_facing: false,
         description: "",
     }
     const [form, setForm] = useState<Form>(initial)
@@ -346,6 +348,13 @@ export default function CreateTaskDialog({
                                     onCheckedChange={(c) => set("is_milestone", c === true)}
                                 />
                                 {_("Is Milestone")}
+                            </Label>
+                            <Label className="flex items-center gap-2">
+                                <Checkbox
+                                    checked={form.raven_customer_facing}
+                                    onCheckedChange={(c) => set("raven_customer_facing", c === true)}
+                                />
+                                {_("Customer-facing")}
                             </Label>
                             <Label className="flex items-center gap-2">
                                 {_("Color")}
