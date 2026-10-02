@@ -38,7 +38,12 @@ def after_insert(doc, method):
 	if not hub_enabled() or not settings.auto_create_project_channel:
 		return
 
-	create_project_channel(doc, settings.project_workspace, settings.project_channel_type or "Private")
+	# A rule for the Project's type wins; everything else lands in the default workspace.
+	workspace = next(
+		(r.raven_workspace for r in settings.project_type_workspaces if r.project_type == doc.project_type),
+		settings.project_workspace,
+	)
+	create_project_channel(doc, workspace, settings.project_channel_type or "Private")
 
 
 def on_update(doc, method):

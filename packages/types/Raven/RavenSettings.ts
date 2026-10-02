@@ -1,5 +1,6 @@
 import { RavenHRCompanyWorkspace } from '../RavenIntegrations/RavenHRCompanyWorkspace'
 import { RavenBlockedLinks } from './RavenBlockedLinks'
+import { RavenProjectTypeWorkspace } from './RavenProjectTypeWorkspace'
 
 export interface RavenSettings{
 	creation: string
@@ -82,8 +83,10 @@ export interface RavenSettings{
 	auto_create_project_channel?: 0 | 1
 	/**	Project Channel Type : Select	*/
 	project_channel_type?: "Public" | "Private"
-	/**	Project Workspace : Link - Raven Workspace	*/
+	/**	Default Project Workspace : Link - Raven Workspace	*/
 	project_workspace?: string
+	/**	Workspace by Project Type : Table - Raven Project Type Workspace	*/
+	project_type_workspaces?: RavenProjectTypeWorkspace[]
 	/**	Project Bot : Link - Raven Bot	*/
 	project_bot?: string
 	/**	GitHub Token : Password	*/

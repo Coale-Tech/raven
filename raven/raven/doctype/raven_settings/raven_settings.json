@@ -60,6 +60,7 @@
   "auto_create_project_channel",
   "project_channel_type",
   "project_workspace",
+  "project_type_workspaces",
   "project_bot",
   "github_token",
   "raven_mobile_tab",
@@ -167,9 +168,17 @@
    "depends_on": "eval:doc.auto_create_project_channel",
    "fieldname": "project_workspace",
    "fieldtype": "Link",
-   "label": "Project Workspace",
+   "label": "Default Project Workspace",
    "mandatory_depends_on": "eval:doc.auto_create_project_channel",
    "options": "Raven Workspace"
+  },
+  {
+   "depends_on": "eval:doc.auto_create_project_channel",
+   "description": "A new Project whose Project Type is listed here gets its channel in that workspace instead of the default.",
+   "fieldname": "project_type_workspaces",
+   "fieldtype": "Table",
+   "label": "Workspace by Project Type",
+   "options": "Raven Project Type Workspace"
   },
   {
    "fieldname": "project_bot",

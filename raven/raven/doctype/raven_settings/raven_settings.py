@@ -16,6 +16,9 @@ class RavenSettings(Document):
 		from frappe.types import DF
 
 		from raven.raven.doctype.raven_blocked_links.raven_blocked_links import RavenBlockedLinks
+		from raven.raven.doctype.raven_project_type_workspace.raven_project_type_workspace import (
+			RavenProjectTypeWorkspace,
+		)
 		from raven.raven_integrations.doctype.raven_hr_company_workspace.raven_hr_company_workspace import (
 			RavenHRCompanyWorkspace,
 		)
@@ -60,6 +63,7 @@ class RavenSettings(Document):
 		project_bot: DF.Link | None
 		project_channel_type: DF.Literal["Public", "Private"]
 		project_workspace: DF.Link | None
+		project_type_workspaces: DF.Table[RavenProjectTypeWorkspace]
 		push_notification_api_key: DF.Data | None
 		push_notification_api_secret: DF.Password | None
 		push_notification_server_url: DF.Data | None
