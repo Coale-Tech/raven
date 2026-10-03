@@ -8,6 +8,7 @@ import {
     CircleAlert,
     Files,
     GitBranch,
+    Inbox,
     LayoutDashboard,
     ListChecks,
     Mail,
@@ -34,6 +35,7 @@ import CommunicationTab from "@components/features/project/tabs/CommunicationTab
 import GitHubTab from "@components/features/project/tabs/GitHubTab"
 import BillingTab from "@components/features/project/tabs/BillingTab"
 import IssuesTab from "@components/features/project/tabs/IssuesTab"
+import SuggestionsTab from "@components/features/project/tabs/SuggestionsTab"
 import DocumentsTab from "@components/features/project/tabs/DocumentsTab"
 import { projectPanelOpenAtom } from "@utils/projectAtoms"
 import { useIsMobile } from "@hooks/use-mobile"
@@ -54,7 +56,7 @@ export type ProjectSummary = {
     channel: string | null
 }
 
-type TabKey = "channel" | "overview" | "tasks" | "notes" | "communication" | "github" | "billing" | "issues" | "documents"
+type TabKey = "channel" | "overview" | "tasks" | "inbox" | "notes" | "communication" | "github" | "billing" | "issues" | "documents"
 
 const LAST_TAB_KEY = "ravenLastProjectTab"
 
@@ -85,6 +87,7 @@ const TABS: {
         panel: TasksTab,
         contentClassName: "flex flex-1 min-h-0 flex-col overflow-hidden p-5",
     },
+    { key: "inbox", label: "Inbox", icon: Inbox, panel: SuggestionsTab },
     { key: "notes", label: "Notes", icon: NotepadText, panel: NotesTab },
     { key: "communication", label: "Communication", icon: Mail, panel: CommunicationTab },
     { key: "github", label: "GitHub", icon: GitBranch, panel: GitHubTab },

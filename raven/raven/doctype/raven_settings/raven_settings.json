@@ -63,6 +63,8 @@
   "project_type_workspaces",
   "project_bot",
   "github_token",
+  "suggestion_daily_limit",
+  "suggest_from_channels",
   "raven_mobile_tab",
   "oauth_client",
   "push_notifications_tab",
@@ -193,6 +195,22 @@
    "fieldname": "github_token",
    "fieldtype": "Password",
    "label": "GitHub Token"
+  },
+  {
+   "default": "200",
+   "depends_on": "eval:doc.enable_project_hub && doc.enable_ai_integration",
+   "description": "Max AI reads of inbound messages per day when suggesting tasks for the Project Hub Inbox.",
+   "fieldname": "suggestion_daily_limit",
+   "fieldtype": "Int",
+   "label": "Suggestion Extractions per Day"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_project_hub && doc.enable_ai_integration",
+   "description": "Also read what the team writes in project channels. Costs one AI read per message and counts toward the daily limit.",
+   "fieldname": "suggest_from_channels",
+   "fieldtype": "Check",
+   "label": "Suggest from Project Channel Messages"
   },
   {
    "fieldname": "ai_section",

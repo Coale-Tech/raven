@@ -129,6 +129,12 @@ const ProjectHubFields = () => {
                         formDescription={_("Fine-grained token with read access to Contents and Metadata, used to show a Project's changelog.")}
                         inputProps={{ type: "password", placeholder: "••••••••••••••••••••", autoComplete: "off" }}
                     />
+
+                    <SwitchFormField
+                        name="suggest_from_channels"
+                        label={_("Suggest from project channel messages")}
+                        formDescription={_("Also let AI read what your team writes in project channels. Costs one AI read per message and counts toward the daily limit. Needs AI Integration enabled.")}
+                    />
                 </>
             ) : null}
         </>

@@ -91,6 +91,10 @@ export interface RavenSettings{
 	project_bot?: string
 	/**	GitHub Token : Password	*/
 	github_token?: string
+	/**	Suggestion Extractions per Day : Int	*/
+	suggestion_daily_limit?: number
+	/**	Suggest from Project Channel Messages : Check	*/
+	suggest_from_channels?: 0 | 1
 	/**	OAuth Client : Link - OAuth Client	*/
 	oauth_client?: string
 	/**	Push Notification Service : Select	*/

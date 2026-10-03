@@ -21,6 +21,9 @@ AGENT_PROVIDERS = ("OpenAI", "Local LLM", "ChatGPT Subscription", "NVIDIA", "Oll
 # api.openai.com -- metered keys and subscription credentials are not
 # interchangeable (see openai_codex_auth.py).
 CHATGPT_BACKEND = "https://chatgpt.com/backend-api/codex"
+# The web settings form leaves these empty when the user keeps the placeholder.
+NVIDIA_URL = "https://integrate.api.nvidia.com/v1"
+OLLAMA_URL = "https://ollama.com"
 
 _ENABLE_FIELD = {
 	"ChatGPT Subscription": "enable_chatgpt_subscription",
@@ -55,11 +58,13 @@ def build_client(provider: str, settings) -> tuple[AsyncOpenAI, bool]:
 		return client, True
 
 	if provider == "NVIDIA":
-		client = AsyncOpenAI(api_key=settings.get_password("nvidia_api_key"), base_url=settings.nvidia_api_url)
+		client = AsyncOpenAI(
+			api_key=settings.get_password("nvidia_api_key"), base_url=settings.nvidia_api_url or NVIDIA_URL
+		)
 		return client, False
 
 	if provider == "Ollama Cloud":
-		base_url = f"{settings.ollama_api_url.rstrip('/')}/v1"
+		base_url = f"{(settings.ollama_api_url or OLLAMA_URL).rstrip('/')}/v1"
 		client = AsyncOpenAI(api_key=settings.get_password("ollama_api_key"), base_url=base_url)
 		return client, False
 
@@ -75,7 +80,7 @@ def list_models(provider: str, settings) -> list[str]:
 
 	if provider == "NVIDIA":
 		response = requests.get(
-			f"{settings.nvidia_api_url.rstrip('/')}/models",
+			f"{(settings.nvidia_api_url or NVIDIA_URL).rstrip('/')}/models",
 			headers={"Authorization": f"Bearer {settings.get_password('nvidia_api_key')}"},
 			timeout=10,
 		)
@@ -84,7 +89,7 @@ def list_models(provider: str, settings) -> list[str]:
 
 	if provider == "Ollama Cloud":
 		response = requests.get(
-			f"{settings.ollama_api_url.rstrip('/')}/api/tags",
+			f"{(settings.ollama_api_url or OLLAMA_URL).rstrip('/')}/api/tags",
 			headers={"Authorization": f"Bearer {settings.get_password('ollama_api_key')}"},
 			timeout=10,
 		)

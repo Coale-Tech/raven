@@ -171,6 +171,9 @@ doc_events = {
 		"after_insert": "raven.raven_integrations.controllers.issue.after_insert",
 		"on_update": "raven.raven_integrations.controllers.issue.on_update",
 	},
+	"WhatsApp Message": {"after_insert": "raven.raven_integrations.project.suggestions.on_whatsapp_message"},
+	"Communication": {"after_insert": "raven.raven_integrations.project.suggestions.on_communication"},
+	"Raven Message": {"after_insert": "raven.raven_integrations.project.suggestions.on_raven_message"},
 }
 
 # Scheduled Tasks

@@ -68,3 +68,4 @@ def on_trash(doc, method):
 		{"linked_doctype": None, "linked_document": None, "is_synced": 0},
 	)
 	frappe.db.set_value("Raven Workspace", {"linked_project": doc.name}, "linked_project", None)
+	frappe.db.delete("Raven Suggestion", {"project": doc.name})
