@@ -14,14 +14,12 @@ import type { RavenSettings } from "@raven/types/Raven/RavenSettings"
 import type { RavenHRCompanyWorkspace } from "@raven/types/RavenIntegrations/RavenHRCompanyWorkspace"
 import { AlertTriangleIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import _ from "@lib/translate"
+import { isHRInstalled } from "@lib/apps"
 
 const FORM_ID = "settings-hr-form"
 
-/** Frappe HR is a separate app — its settings only make sense when it's installed. */
-const isHRInstalled = () => window?.frappe?.boot?.versions?.hrms !== undefined
-
 /** Own component, not a render prop — see AdminSettingsForm. */
-const FrappeHRFields = () => {
+export const FrappeHRFields = () => {
     const { control } = useFormContext<RavenSettings>()
     const autoCreate = useWatch({ control, name: "auto_create_department_channel" })
 

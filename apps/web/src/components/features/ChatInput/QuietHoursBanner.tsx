@@ -1,3 +1,4 @@
+import { siteKey } from "@lib/site"
 import { useLayoutEffect, useReducer, useRef, useState } from "react"
 import { useAtomValue } from "jotai"
 import { ClockIcon, EllipsisVerticalIcon, MoonStarIcon, XIcon } from "lucide-react"
@@ -19,6 +20,7 @@ import { hasRole } from "@lib/permissions"
 import { quietHoursNudgeAtom, type QuietHoursNudge } from "@utils/preferences"
 import { currentQuietPeriodStartMs } from "@utils/quietHours"
 import _ from "@lib/translate"
+import { isApple } from "@utils/platform"
 
 /**
  * One banner on screen, ever. Multiple composers can be mounted at once — a
@@ -69,7 +71,7 @@ const DISMISSED_AT_KEY = "raven-quiet-hours-banner-dismissed-at"
 
 const isDismissedThisPeriod = () => {
     try {
-        const at = Number(localStorage.getItem(DISMISSED_AT_KEY))
+        const at = Number(localStorage.getItem(siteKey(DISMISSED_AT_KEY)))
         const periodStart = currentQuietPeriodStartMs()
         return Number.isFinite(at) && periodStart !== null && at >= periodStart
     } catch {
@@ -104,7 +106,7 @@ export const QuietHoursBanner = ({ mode }: { mode: QuietSendMode }) => {
 
     const dismiss = () => {
         try {
-            localStorage.setItem(DISMISSED_AT_KEY, String(Date.now()))
+            localStorage.setItem(siteKey(DISMISSED_AT_KEY), String(Date.now()))
         } catch {
             // Storage unavailable — the banner just returns next mount.
         }
@@ -128,7 +130,7 @@ const QuietHoursBannerContent = ({ mode, onDismiss }: { mode: QuietSendMode; onD
             ? _("It's outside working hours - your messages will be sent silently.")
             : isMobile
                 ? _("It's outside working hours - hold the send to message without pinging anyone.")
-                : _("It's outside working hours - send silently to let people rest (⌘⇧↵).")
+                : _("It's outside working hours - send silently to let people rest ({0}).", [isApple ? "⌘⇧↵" : "Ctrl+Shift+Enter"])
 
     return (
         <div className="flex items-center gap-1.5 rounded-md bg-surface-gray-2 dark:bg-surface-elevation-2 py-1 pl-3 pr-1 md:mx-0 mx-1">

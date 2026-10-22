@@ -1,10 +1,11 @@
 {
   "private": true,
   "name": "raven",
-  "version": "2.8.11",
+  "version": "3.1.0",
   "description": "Messaging Application",
   "workspaces": [
     "apps/web",
+    "apps/native",
     "packages/*"
   ],
   "main": "index.js",
@@ -12,13 +13,22 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "cd apps/web && yarn dev",
     "build": "cd apps/web && yarn build",
-    "postinstall": "yarn install-desk && yarn install-web",
-    "install-desk": "cd raven && yarn install",
-    "install-web": "cd apps/web && yarn install"
+    "postinstall": "yarn install-web",
+    "install-web": "cd apps/web && yarn install",
+    "native:build": "cd apps/web && yarn build:native",
+    "native:sync": "yarn native:build && cd apps/native && yarn sync",
+    "native:clean": "cd apps/native && yarn clean",
+    "native:ios": "cd apps/native && yarn ios",
+    "native:android": "cd apps/native && yarn android",
+    "native:testflight": "cd apps/native && yarn testflight",
+    "native:playstore": "cd apps/native && yarn playstore"
   },
   "keywords": [],
   "author": "",
   "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "devDependencies": {
     "turbo": "^2.3.3"
   },

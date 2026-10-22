@@ -76,14 +76,17 @@ const UserList = ({ text }: { text: string }) => {
     if (text && !filteredUsers.length) return null
     // filteredUsers need to be mapped to dmChannels and then render DMChannelItem or UserItem based on whether dm_channel exists or not. In UserItem, we will do api call on click to create dm_channel and then navigate to that dm_channel
 
-    const rows = mappedUsers.map(({ user, channel }) => {
-        if (!user) return null
+    const rows = mappedUsers.flatMap(({ user, channel }) => {
+        if (!user) return []
         return channel ? (
             <DMChannelItem key={channel.name} user={user} channel={channel} />
         ) : (
             <UserItem key={user.name} user={user} />
         )
     })
+    // No DMs yet (or none whose peer is loaded): cmdk only hides an empty group while
+    // searching, so the browse-mode "Users" heading would sit over nothing.
+    if (!rows.length) return null
 
     // While searching, rows go bare into the palette's single ranking group
     // (see CommandPalette) so people compete with channels and commands on

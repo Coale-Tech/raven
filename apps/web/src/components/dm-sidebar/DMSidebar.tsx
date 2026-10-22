@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from "react"
+import { memo, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { NavLink, useMatch, useNavigate } from "react-router-dom"
 import { useHotkeys } from "react-hotkeys-hook"
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
@@ -12,6 +12,7 @@ import { db, type UserData } from "@db"
 import { cn } from "@lib/utils"
 import { formatRelativeDate } from "@lib/date"
 import { getMessageTeaser } from "@utils/messageUtils"
+import { TeaserText } from "@components/common/TeaserText"
 import { getUserDisplayName, isCurrentUser } from "@utils/userDisplay"
 import { useChannelDraft } from "@components/features/ChatInput/draft"
 import _ from "@lib/translate"
@@ -158,17 +159,24 @@ export function DMSidebar() {
                         <DMSidebarSkeleton />
                     </div>
                 ) : rows.length === 0 ? (
-                    // No virtualizer for an empty list — just the empty state and,
-                    // when the org has people to suggest, the start-a-DM rows
-                    <Empty>
-                        <EmptyMedia>
-                            <UsersRoundIcon />
-                        </EmptyMedia>
-                        <EmptyHeader>
-                            <EmptyTitle>{_("No conversations yet")}</EmptyTitle>
-                            <EmptyDescription>{_("Search for a user and start a conversation.")}</EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
+                    // No virtualizer for an empty list: people to start a conversation with,
+                    // or the empty state when there's no one to suggest.
+                    <div className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
+                        <ExtraUsersList
+                            dmPeerIds={dmPeerIds}
+                            whenNone={
+                                <Empty>
+                                    <EmptyMedia>
+                                        <UsersRoundIcon />
+                                    </EmptyMedia>
+                                    <EmptyHeader>
+                                        <EmptyTitle>{_("No conversations yet")}</EmptyTitle>
+                                        <EmptyDescription>{_("Search for a user and start a conversation.")}</EmptyDescription>
+                                    </EmptyHeader>
+                                </Empty>
+                            }
+                        />
+                    </div>
                 ) : (
                     <Virtuoso
                         ref={virtuosoRef}
@@ -190,10 +198,10 @@ export function DMSidebar() {
 }
 
 
-function DMSidebarSkeleton() {
+export function DMSidebarSkeleton({ count = 10 }: { count?: number }) {
     return (
         <>
-            {Array.from({ length: 10 }).map((_, i) => (
+            {Array.from({ length: count }).map((_, i) => (
                 <div
                     key={i}
                     className="flex items-start gap-3 px-3 py-3 md:py-2"
@@ -253,24 +261,26 @@ const DMRow = memo(function DMRow({ dmChannel, peerUser }: DMRowProps) {
 })
 
 
-function ExtraUsersList({ dmPeerIds }: { dmPeerIds: Set<string> }) {
+/** Up to five people with no DM yet, as rows that start one. `whenNone` shows once the query proves there's nobody. */
+function ExtraUsersList({ dmPeerIds, whenNone = null }: { dmPeerIds: Set<string>; whenNone?: ReactNode }) {
     const { name: currentUser } = useUserCookieData()
 
-    const users =
-        useLiveQuery(
-            () =>
-                db.users
-                    .where("enabled")
-                    .equals(1)
-                    .and((u) => u.name !== currentUser)
-                    .and((u) => u.type !== "Bot")
-                    .and((u) => !dmPeerIds.has(u.name))
-                    .limit(5)
-                    .toArray(),
-            [currentUser, dmPeerIds]
-        ) ?? []
+    // Undefined until the first query result: nothing is shown meanwhile, so the empty state can't flash.
+    const users = useLiveQuery(
+        () =>
+            db.users
+                .where("enabled")
+                .equals(1)
+                .and((u) => u.name !== currentUser)
+                .and((u) => u.type !== "Bot")
+                .and((u) => !dmPeerIds.has(u.name))
+                .limit(5)
+                .toArray(),
+        [currentUser, dmPeerIds]
+    )
 
-    if (users.length === 0) return null
+    if (users === undefined) return null
+    if (users.length === 0) return whenNone
 
     return (
         <>
@@ -377,7 +387,7 @@ function DMRowShell({
                         )}
                     >
                         {isDraft && <span className="font-medium text-ink-gray-6">{_("Draft")}: </span>}
-                        {lastMessage}
+                        <TeaserText text={lastMessage} />
                     </div>}
                     {unread > 0 && (
                         <Badge size="sm" variant="subtle" theme="gray">

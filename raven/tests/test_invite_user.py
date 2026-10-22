@@ -36,12 +36,14 @@ class TestInviteUser(IntegrationTestCase):
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
-		for email in ("invitee@example.com",):
-			if frappe.db.exists("User", email):
-				frappe.delete_doc("User", email, force=True)
+		# Workspaces first: deleting them clears their member rows, so the
+		# invitee's Raven User has no links left when the User goes.
 		self.channel.delete()
 		self.workspace.delete()
 		self.other_workspace.delete()
+		for email in ("invitee@example.com", "invitee-two@example.com"):
+			if frappe.db.exists("User", email):
+				frappe.delete_doc("User", email, force=True)
 
 	def _is_member(self, user, workspace):
 		return bool(frappe.db.exists("Raven Workspace Member", {"workspace": workspace, "user": user}))
@@ -91,3 +93,33 @@ class TestInviteUser(IntegrationTestCase):
 		invite_user("invitee@example.com", "Invitee", "Person")
 		self.assertTrue(frappe.db.exists("Raven User", "invitee@example.com"))
 		self.assertFalse(self._is_member("invitee@example.com", self.workspace.name))
+
+	def test_inviting_again_keeps_one_membership(self):
+		# A reload mid-setup, or inviting someone already there, must not fail on "already a member".
+		for _ in range(2):
+			invite_user(
+				"invitee@example.com",
+				"Invitee",
+				"Person",
+				workspaces=[self.workspace.name],
+				channels=[self.channel.name],
+			)
+		self.assertEqual(
+			frappe.db.count(
+				"Raven Workspace Member", {"workspace": self.workspace.name, "user": "invitee@example.com"}
+			),
+			1,
+		)
+		self.assertEqual(
+			frappe.db.count(
+				"Raven Channel Member", {"channel_id": self.channel.name, "user_id": "invitee@example.com"}
+			),
+			1,
+		)
+
+	def test_invitees_sharing_a_first_name_are_both_created(self):
+		# Frappe derives the username from the first name; sent one after another it adds a suffix.
+		invite_user("invitee@example.com", "Invitee", workspaces=[self.workspace.name])
+		invite_user("invitee-two@example.com", "Invitee", workspaces=[self.workspace.name])
+		self.assertTrue(self._is_member("invitee@example.com", self.workspace.name))
+		self.assertTrue(self._is_member("invitee-two@example.com", self.workspace.name))

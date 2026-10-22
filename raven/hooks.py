@@ -14,16 +14,16 @@ app_logo_url = "/assets/raven/raven_logo.svg"
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = "raven.bundle.css"
-# app_include_css = "/assets/raven/css/raven.css"
-# app_include_js = "/assets/raven/js/raven.js"                 ]
 app_include_js = "raven.bundle.js"
+# Raven's own desk icons, e.g. frappe.utils.icon("raven").
+app_include_icons = ["/assets/raven/icons/raven.svg"]
 
 add_to_apps_screen = [
 	{
 		"name": "raven",
 		"logo": "/assets/raven/raven_logo.svg",
 		"title": "Raven",
+		"setup_wizard_text": "Welcome to Raven. Let's set up your team's space.",
 		"route": "/raven",
 		"has_permission": "raven.permissions.check_app_permission",
 	}
@@ -91,7 +91,9 @@ jinja = {"methods": ["raven.raven_integrations.report.customer_statement.custome
 # ------------
 
 # before_install = "raven.install.before_install"
-after_install = "raven.install.after_install"
+# On Frappe Cloud, set push up on install and at setup, so it works from the first message.
+after_install = ["raven.install.after_install", "raven.frappe_cloud_push.queue_initial_push_setup"]
+setup_wizard_success = "raven.frappe_cloud_push.queue_initial_push_setup"
 after_migrate = [
 	"raven.install.add_customer_statement_to_selling_sidebar",
 	"raven.raven_integrations.project.setup.add_task_customer_facing_field",
@@ -314,6 +316,8 @@ on_session_creation = "raven.api.user_availability.set_user_active"
 
 # The bundled native app runs from its own origins; allow them on API calls without site config.
 before_request = ["raven.api.native.set_cors"]
+# Frappe 15 ignores the origin set_cors chooses, so Raven writes the CORS headers there itself.
+after_request = ["raven.api.native.add_cors_headers"]
 on_logout = "raven.api.user_availability.set_user_inactive"
 
 export_python_type_annotations = True

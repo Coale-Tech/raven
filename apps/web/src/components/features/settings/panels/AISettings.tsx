@@ -12,8 +12,14 @@ import { AdminSettingsForm } from "./AdminSettingsForm"
 import ChatGPTSubscriptionLogin from "./ai/ChatGPTSubscriptionLogin"
 import type { RavenSettings } from "@raven/types/Raven/RavenSettings"
 import _ from "@lib/translate"
+import { hasRole } from "@lib/permissions"
 
 const FORM_ID = "settings-ai-form"
+
+/** Shown instead of the provider keys and URLs, which only System Managers can see and change. */
+const ProviderSetByAdmin = () => (
+    <p className="text-p-sm text-ink-gray-5">{_("Only a System Manager can change these settings.")}</p>
+)
 
 /**
  * The fields, as their own component rather than a render prop — see AdminSettingsForm
@@ -30,6 +36,8 @@ const AISettingsFields = () => {
     const chatgptEnabled = useWatch({ control, name: "enable_chatgpt_subscription" })
     const nvidiaEnabled = useWatch({ control, name: "enable_nvidia" })
     const ollamaEnabled = useWatch({ control, name: "enable_ollama_cloud" })
+    // Provider keys and URLs are System Manager only (permlevel 1 on Raven Settings).
+    const canEditProviders = hasRole("System Manager")
 
     const { data: openaiVersion } = useFrappeGetCall<{ message: string }>(
         "raven.api.ai_features.get_open_ai_version",
@@ -96,7 +104,8 @@ const AISettingsFields = () => {
                         label={_("Enable OpenAI Services")}
                         formDescription={_("Use OpenAI models for AI features.")}
                     />
-                    {openaiEnabled ? (
+                    {openaiEnabled && !canEditProviders ? <ProviderSetByAdmin /> : null}
+                    {openaiEnabled && canEditProviders ? (
                         <div className="flex flex-col gap-4 pl-1">
                             <DataField
                                 name="openai_organisation_id"
@@ -136,7 +145,21 @@ const AISettingsFields = () => {
                         label={_("Enable Local LLM")}
                         formDescription={_("Use a self-hosted, OpenAI-compatible model.")}
                     />
-                    {localEnabled ? (
+                    {localEnabled && !canEditProviders ? (
+                        <div className="flex flex-col gap-4 pl-1">
+                            <ProviderSetByAdmin />
+                            {/* Tests the saved server. The server ignores any other URL for non-System Managers. */}
+                            <Button type="button" variant="outline" size="sm" className="self-start" onClick={handleTestConnection} disabled={testing}>
+                                {_("Test Connection")}
+                            </Button>
+                            {testResult && (
+                                <Alert theme={testResult.success ? "green" : "red"}>
+                                    <AlertDescription>{testResult.message}</AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
+                    ) : null}
+                    {localEnabled && canEditProviders ? (
                         <div className="flex flex-col gap-4 pl-1">
                             <SelectFormField name="local_llm_provider" label={_("Provider")}>
                                 <SelectItem value="LM Studio">{_("LM Studio")}</SelectItem>
@@ -195,7 +218,8 @@ const AISettingsFields = () => {
                         label={_("Enable ChatGPT Subscription")}
                         formDescription={_("Use your ChatGPT Plus/Pro subscription instead of API billing.")}
                     />
-                    {chatgptEnabled ? (
+                    {chatgptEnabled && !canEditProviders ? <ProviderSetByAdmin /> : null}
+                    {chatgptEnabled && canEditProviders ? (
                         <div className="flex flex-col gap-4 pl-1">
                             <ChatGPTSubscriptionLogin />
                         </div>
@@ -209,7 +233,8 @@ const AISettingsFields = () => {
                         label={_("Enable NVIDIA")}
                         formDescription={_("Use models served by NVIDIA's OpenAI-compatible API.")}
                     />
-                    {nvidiaEnabled ? (
+                    {nvidiaEnabled && !canEditProviders ? <ProviderSetByAdmin /> : null}
+                    {nvidiaEnabled && canEditProviders ? (
                         <div className="flex flex-col gap-4 pl-1">
                             <DataField
                                 name="nvidia_api_key"
@@ -247,7 +272,8 @@ const AISettingsFields = () => {
                         label={_("Enable Ollama Cloud")}
                         formDescription={_("Use models served by Ollama Cloud.")}
                     />
-                    {ollamaEnabled ? (
+                    {ollamaEnabled && !canEditProviders ? <ProviderSetByAdmin /> : null}
+                    {ollamaEnabled && canEditProviders ? (
                         <div className="flex flex-col gap-4 pl-1">
                             <DataField
                                 name="ollama_api_key"

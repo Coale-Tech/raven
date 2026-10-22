@@ -13,8 +13,8 @@ raven/public/node_modules
 raven/www/raven.html
 *.env
 
-apps/mobile/ios
-apps/mobile/android
-apps/mobile/.expo
 
 apps/web/.env.local
+# Store screenshots and the demo site seed: local tooling, not part of the app
+screenshots/
+raven/demo/

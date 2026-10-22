@@ -31,6 +31,8 @@ const PushNotificationFields = () => {
     const { control, setValue } = useFormContext<RavenSettings>()
     const service = useWatch({ control, name: "push_notification_service" })
     const usesFrappeCloud = service === "Frappe Cloud"
+    // The server URL and keys are System Manager only (permlevel 1 on Raven Settings).
+    const canEditCredentials = hasRole("System Manager")
 
     // A site that never chose a service saves as Raven Cloud. This coerces the
     // loaded value; the parent form resets from the server doc after mount.
@@ -53,10 +55,23 @@ const PushNotificationFields = () => {
                         {_("The new Raven web app only supports Raven Cloud. Switch to Raven Cloud and add your credentials to keep push notifications working.")}
                     </span>
                     <div className="mt-2">
-                        <Button type="button" variant="subtle" size="sm" onClick={switchToRavenCloud}>{_("Switch to Raven Cloud")}</Button>
+                        {canEditCredentials ? (
+                            <Button type="button" variant="subtle" size="sm" onClick={switchToRavenCloud}>{_("Switch to Raven Cloud")}</Button>
+                        ) : (
+                            <span>{_("Ask a System Manager to switch.")}</span>
+                        )}
                     </div>
                 </AlertDescription>
             </Alert>
+        )
+    }
+
+    if (!canEditCredentials) {
+        return (
+            <>
+                <p className="text-p-sm text-ink-gray-5">{_("Only a System Manager can change these settings.")}</p>
+                <ServiceActions />
+            </>
         )
     }
 
@@ -102,7 +117,11 @@ const PushNotificationFields = () => {
             <DataField
                 name="push_notification_api_key"
                 label={_("Push Notification API Key")}
-                rules={{ maxLength: { value: 140, message: _("API Key cannot be more than 140 characters.") } }}
+                isRequired
+                rules={{
+                    required: _("Please add your Push Notification API Key"),
+                    maxLength: { value: 140, message: _("API Key cannot be more than 140 characters.") },
+                }}
                 inputProps={{ placeholder: _("Your API Key"), ...NO_AUTOFILL }}
             />
             <DataField
@@ -120,17 +139,22 @@ const PushNotificationFields = () => {
 
 /**
  * Register / Sync buttons act on the SAVED settings, not the form, so they only
- * appear once Raven Cloud is saved with a server URL (and, for Sync, a VAPID key
- * from a successful registration).
+ * appear once Raven Cloud is saved with a server URL, or while Frappe Cloud setup
+ * is pending (and, for Sync, a VAPID key from a successful registration).
  */
 const ServiceActions = () => {
     const { ravenSettings, mutate } = useRavenSettings()
     // Each endpoint checks a different role, so each button is gated by exactly that role.
     const canRegister = hasRole("System Manager")
     const canSync = hasRole("Raven Admin")
-    const savedRavenCloud = ravenSettings?.push_notification_service === "Raven" && Boolean(ravenSettings?.push_notification_server_url)
+    // Only System Managers can read the server URL. The VAPID key is set by a
+    // successful registration and is readable by everyone who can open this panel.
+    const savedRavenCloud = ravenSettings?.push_notification_service === "Raven"
+        && Boolean(ravenSettings?.push_notification_server_url || ravenSettings?.vapid_public_key)
+    // On Frappe Cloud, a System Manager can retry a setup that failed before anything was saved.
+    const frappeCloudSetupPending = Boolean(window.frappe?.boot?.raven_cloud_push_setup_pending)
 
-    if (!savedRavenCloud) return null
+    if (!savedRavenCloud && !frappeCloudSetupPending) return null
     return (
         <div className="flex flex-wrap gap-2">
             <RegisterSiteButton registered={Boolean(ravenSettings?.vapid_public_key)} disabled={!canRegister} onDone={() => mutate()} />

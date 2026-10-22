@@ -27,11 +27,11 @@ def get(doctype: str, docname: str | int, with_site_url: bool = True):
 			link = frappe.get_attr(hook)(doctype, docname)
 			if link:
 				if with_site_url:
-					return get_url() + link
+					return get_url(allow_header_override=False) + link
 				return link
 
 	if with_site_url:
-		return frappe.utils.get_url() + f"/desk/{slug(doctype)}/{docname}"
+		return frappe.utils.get_url(allow_header_override=False) + f"/desk/{slug(doctype)}/{docname}"
 
 	return f"/desk/{slug(doctype)}/{docname}"
 

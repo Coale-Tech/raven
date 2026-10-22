@@ -1,3 +1,4 @@
+import { siteOrigin, siteUrl } from "@lib/site"
 import { Fragment, useContext, useMemo, useState } from "react"
 import parse from "html-react-parser"
 import dayjs from "dayjs"
@@ -42,6 +43,7 @@ import { slug } from "@lib/frappe"
 import { USER_DATE_FORMAT } from "@lib/date"
 import { DocumentPrintDialog } from "./DocumentPrintDialog"
 import _ from "@lib/translate"
+import { Separator } from "@components/ui/separator"
 
 // For best-effort parsing of server-formatted dates back into dayjs (tooltips).
 dayjs.extend(customParseFormat)
@@ -171,7 +173,7 @@ export const ServerHtml = ({ html, className }: { html: string; className?: stri
 
 /** Fallback route when the preview (and its hook-resolved link) isn't available. */
 const defaultDocRoute = (doctype: string, docname: string) =>
-    `${window.location.origin}/desk/${slug(doctype)}/${encodeURIComponent(docname)}`
+    `${siteOrigin()}/desk/${slug(doctype)}/${encodeURIComponent(docname)}`
 
 /** One cache entry per document, shared by the card AND the composer's staged
  *  chip — the chip pre-warms exactly what the sent card will read. */
@@ -325,23 +327,22 @@ const DocumentCard = ({
                 {preview.preview_image && (
                     // Explicit square box so the image can't shift the card as it loads.
                     <img
-                        src={preview.preview_image}
+                        src={siteUrl(preview.preview_image)}
                         alt=""
                         loading="lazy"
                         className="size-10 shrink-0 rounded-md bg-surface-gray-3 object-cover"
                     />
                 )}
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <div className="flex items-center gap-1.5">
-                        <Badge variant="subtle" theme="gray">
-                            {doctype}
-                        </Badge>
+                    <div className="flex items-center gap-1.5 text-p-xs text-ink-gray-5">
+                        <span>{doctype}</span>
+                        <Separator orientation="vertical" className="bg-outline-gray-2 data-[orientation=vertical]:h-3.5" />
                         {preview.id && (
                             <button
                                 type="button"
                                 onClick={copyId}
                                 title={_("Copy ID")}
-                                className="cursor-copy truncate text-p-xs text-ink-gray-5"
+                                className="cursor-copy truncate text-p-xs text-ink-gray-5 px-0"
                             >
                                 {preview.id}
                             </button>
@@ -451,7 +452,7 @@ export const DocumentPreviewSummary = ({ doctype, docname }: { doctype: string; 
             <div className="flex items-start gap-2.5">
                 {preview.preview_image && (
                     <img
-                        src={preview.preview_image}
+                        src={siteUrl(preview.preview_image)}
                         alt=""
                         loading="lazy"
                         className="size-10 shrink-0 rounded-md bg-surface-gray-3 object-cover"

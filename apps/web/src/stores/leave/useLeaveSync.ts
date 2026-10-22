@@ -2,11 +2,10 @@ import { useEffect } from "react"
 import { useFrappeGetCall } from "frappe-react-sdk"
 import dayjs from "dayjs"
 import { SYSTEM_TIMEZONE } from "@lib/date"
+import { isHRInstalled } from "@lib/apps"
 import { leaveStore } from "./store"
 
 const SIX_HOURS = 1000 * 60 * 60 * 6
-
-const isHRInstalled = () => window?.frappe?.boot?.versions?.hrms !== undefined
 
 // Module-level on purpose: touches only module singletons, so it has no
 // business inside the render cycle. (Same shape as useUnreadSync.)

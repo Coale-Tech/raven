@@ -1,3 +1,4 @@
+import { siteUrl } from "@lib/site"
 import { commandMenuOpenAtom } from "@components/features/cmdk/atoms"
 import NavUserMenu from "@components/features/header/NavUserMenu/NavUserMenu"
 import { Avatar, AvatarFallback, AvatarImage } from "@components/ui/avatar"
@@ -8,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@compo
 import { useUnreadNotificationsCount } from "@hooks/useNotifications"
 import { useRavenSettings } from "@hooks/fetchers/useRavenSettings"
 import { useUnreadReminderCount } from "@components/features/reminders/useReminders"
-import { useWorkspaces, type WorkspaceFields } from "@hooks/useWorkspaces"
+import { useMyWorkspaces, useSaveWorkspaceOrder, useWorkspaces, type WorkspaceFields } from "@hooks/useWorkspaces"
 import { useDMUnread, useWorkspaceUnread } from "@stores/unread/useChannelUnread"
 import { useUnreadThreadsCount } from "@stores/threads/useUnreadThreads"
 import _ from "@lib/translate"
@@ -17,12 +18,9 @@ import { useAtom, useSetAtom } from "jotai"
 import { BellIcon, BookmarkIcon, CalendarClockIcon, FolderKanbanIcon, MessageSquareTextIcon, MoreHorizontalIcon, SearchIcon, UsersIcon } from "lucide-react"
 import { NavLink } from "react-router"
 import { settingsDialogOpenTab } from "@components/features/settings/settingsDialogAtom"
-import { useMemo } from "react"
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { useFrappeUpdateDoc } from "frappe-react-sdk"
-import useCurrentRavenUser from "@raven/lib/hooks/useCurrentRavenUser"
 import ScheduledMessagesDialog from "@components/features/schedule-send/ScheduledMessagesDialog"
 import { scheduledMessagesDialogOpenAtom, useScheduledMessagesCount } from "@components/features/schedule-send/useScheduledMessages"
 
@@ -43,7 +41,7 @@ const suppressNextClick = () => {
 }
 
 const RavenLogo = () => {
-    return <img src="/assets/raven/raven_logo.svg" alt="Raven Logo" className="w-8 h-8" />
+    return <img src={siteUrl("/assets/raven/raven_logo.svg")} alt="Raven Logo" className="w-8 h-8" />
 }
 
 /**
@@ -53,7 +51,8 @@ const RavenLogo = () => {
 const PrimarySidebar = () => {
     return (
         <TooltipProvider delayDuration={0}>
-            <div className="flex flex-col h-full gap-2 shrink-0 justify-between items-center border-r border-outline-gray-2 bg-surface-sidebar w-(--primary-sidebar-width) pb-4 pt-2.5">
+            {/* The rail sits beside <main>, so it pads the status bar inset itself (iPad). */}
+            <div className="flex flex-col h-full gap-2 shrink-0 justify-between items-center border-r border-outline-gray-2 bg-surface-sidebar w-(--primary-sidebar-width) pb-4 pt-2.5 standalone:pt-[calc(var(--inset-top)+0.625rem)]">
                 {/* min-h-0 lets this group shrink below its content, which is what
                     hands the workspace list inside it a bounded height to scroll in.
                     The nav icons above and the saved/profile block below stay put —
@@ -251,25 +250,12 @@ const LaterLink = () => {
 const WorkspaceList = () => {
 
     const { workspaces } = useWorkspaces()
-    const { myProfile, mutate: mutateProfile } = useCurrentRavenUser()
-    const { updateDoc } = useFrappeUpdateDoc()
+    const myWorkspaces = useMyWorkspaces()
+    const saveWorkspaceOrder = useSaveWorkspaceOrder()
 
     const hasMoreWorkspaces = workspaces.some((workspace) => !workspace.workspace_member_name)
 
     const setSettingsDialogOpenTab = useSetAtom(settingsDialogOpenTab)
-
-    // Per-user order from the Raven User's pinned_workspaces child table: rows
-    // come first (in row order), workspaces NOT in the table follow in their
-    // server order — so joining a new workspace never needs a migration, it
-    // just appends until the next drag writes the full order.
-    const myWorkspaces = useMemo(() => {
-        const members = workspaces.filter((workspace) => workspace.workspace_member_name)
-        const position = new Map((myProfile?.pinned_workspaces ?? []).map((row, index) => [row.workspace, index]))
-        if (position.size === 0) return members
-        return [...members].sort(
-            (a, b) => (position.get(a.name) ?? Infinity) - (position.get(b.name) ?? Infinity),
-        )
-    }, [workspaces, myProfile?.pinned_workspaces])
 
     // Distance constraint keeps plain clicks navigating — a drag only starts
     // after 8px of travel.
@@ -279,19 +265,14 @@ const WorkspaceList = () => {
         suppressNextClick()
 
         const { active, over } = event
-        if (!over || active.id === over.id || !myProfile) return
+        if (!over || active.id === over.id) return
         const oldIndex = myWorkspaces.findIndex((workspace) => workspace.name === active.id)
         const newIndex = myWorkspaces.findIndex((workspace) => workspace.name === over.id)
         if (oldIndex < 0 || newIndex < 0) return
 
         // Persist the FULL order — after the first drag every workspace is in
         // the table, and the "extras after" rule only matters for ones joined later.
-        const order = arrayMove(myWorkspaces, oldIndex, newIndex).map((workspace) => ({ workspace: workspace.name }))
-
-        // Optimistic: the sorted list reads from the profile, so patch it locally
-        // first; revert to server truth if the save fails.
-        mutateProfile({ message: { ...myProfile, pinned_workspaces: order } as typeof myProfile }, { revalidate: false })
-        updateDoc("Raven User", myProfile.name, { pinned_workspaces: order }).catch(() => mutateProfile())
+        saveWorkspaceOrder(arrayMove(myWorkspaces, oldIndex, newIndex))
     }
 
     // The one scrolling section of the rail. no-scrollbar because a bar inside
@@ -352,7 +333,7 @@ const WorkspaceItem = ({ workspace }: { workspace: WorkspaceFields }) => {
                         {/* Badge anchors to the avatar, not the full-width rail cell */}
                         <div className="relative">
                             <Avatar className="w-8 h-8 rounded">
-                                <AvatarImage src={workspace.logo} alt={workspace.workspace_name} draggable={false} />
+                                <AvatarImage src={workspace.logo && siteUrl(workspace.logo)} alt={workspace.workspace_name} draggable={false} />
                                 {/* rounded (not the fallback's default rounded-full) to
                                     match the square-ish Avatar root and loaded logo */}
                                 <AvatarFallback className="rounded text-xs bg-surface-gray-2 text-ink-gray-7">

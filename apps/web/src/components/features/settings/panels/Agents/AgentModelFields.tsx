@@ -87,8 +87,10 @@ const ModelSelector = () => {
 
     const { data: localModelData } = useFrappeGetCall<{ message: { success: boolean; models?: { id: string }[] } }>(
         "raven.api.ai_features.test_llm_configuration",
+        // Lists models from the saved LLM server. Only System Managers can read its URL,
+        // so for everyone else the server uses the saved one.
         { provider: "Local LLM", api_url: ravenSettings?.local_llm_api_url, local_llm_provider: ravenSettings?.local_llm_provider },
-        modelProvider === "Local LLM" && ravenSettings?.local_llm_api_url ? undefined : null,
+        modelProvider === "Local LLM" && ravenSettings?.enable_local_llm ? undefined : null,
         { revalidateOnFocus: false, revalidateIfStale: false }
     )
 
