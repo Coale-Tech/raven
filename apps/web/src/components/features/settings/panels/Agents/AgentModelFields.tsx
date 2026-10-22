@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { useFormContext, useWatch } from "react-hook-form"
 import { useFrappeGetCall } from "frappe-react-sdk"
 import { useRavenSettings } from "@hooks/fetchers/useRavenSettings"
@@ -14,11 +15,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { RavenBot } from "@raven/types/RavenBot/RavenBot"
 import _ from "@lib/translate"
 
+/**
+ * The provider the form is on: the saved one, else the first enabled provider (what the select shows).
+ * A new agent has no saved provider and the select's `defaultValue` never reaches `useWatch`, so without
+ * this fallback everything keyed on the provider (model list, tab options) behaves as OpenAI.
+ */
+const useModelProvider = () => {
+    const { control } = useFormContext<RavenBot>()
+    const { ravenSettings: s } = useRavenSettings()
+    const saved = useWatch({ control, name: "model_provider" })
+    return (
+        saved ||
+        (s?.enable_openai_services === 1 ? "OpenAI"
+            : s?.enable_local_llm === 1 ? "Local LLM"
+                : s?.enable_chatgpt_subscription === 1 ? "ChatGPT Subscription"
+                    : s?.enable_nvidia === 1 ? "NVIDIA"
+                        : s?.enable_ollama_cloud === 1 ? "Ollama Cloud" : undefined)
+    )
+}
+
 /** Model provider select — only enabled providers; the no-provider state (full-width alert) is handled by AgentAITab. */
 const ModelProviderSelector = () => {
     const { control } = useFormContext<RavenBot>()
     const { ravenSettings } = useRavenSettings()
     const isAiBot = useWatch({ control, name: "is_ai_bot" })
+    const defaultProvider = useModelProvider()
 
     if (!isAiBot) return null
 
@@ -29,11 +50,6 @@ const ModelProviderSelector = () => {
     const hasOllama = ravenSettings?.enable_ollama_cloud === 1
 
     if (!hasOpenAI && !hasLocalLLM && !hasChatGPT && !hasNvidia && !hasOllama) return null
-
-    const defaultProvider = hasOpenAI ? "OpenAI"
-        : hasLocalLLM ? "Local LLM"
-            : hasChatGPT ? "ChatGPT Subscription"
-                : hasNvidia ? "NVIDIA" : "Ollama Cloud"
 
     return (
         <FormField
@@ -75,13 +91,13 @@ const ModelSelector = () => {
     const { control } = useFormContext<RavenBot>()
     const { ravenSettings } = useRavenSettings()
     const isAiBot = useWatch({ control, name: "is_ai_bot" })
-    const modelProvider = useWatch({ control, name: "model_provider" })
+    const modelProvider = useModelProvider()
     const isHostedProvider = modelProvider === "ChatGPT Subscription" || modelProvider === "NVIDIA" || modelProvider === "Ollama Cloud"
 
     const { data: openaiModels } = useFrappeGetCall<{ message: string[] }>(
         "raven.api.ai_features.get_openai_available_models",
         undefined,
-        isAiBot && (modelProvider === "OpenAI" || !modelProvider) ? undefined : null,
+        isAiBot && ravenSettings && (modelProvider === "OpenAI" || !modelProvider) ? undefined : null,
         { revalidateOnFocus: false, revalidateIfStale: false }
     )
 
@@ -102,12 +118,22 @@ const ModelSelector = () => {
     )
 
     const localModels = localModelData?.message.models?.map((model) => model.id) || []
-
-    if (!isAiBot) return null
-
     const models: string[] = modelProvider === "Local LLM" ? localModels : isHostedProvider ? hostedModels?.message || [] : openaiModels?.message || []
     const defaultModel = modelProvider === "Local LLM" ? localModels[0] || "" : isHostedProvider ? models[0] || "" : "gpt-4o"
     const validModels = models.filter((model) => model && model.trim() !== "")
+
+    // The select shows `defaultModel` for an empty value, and a stale one (e.g. gpt-4o kept from another provider)
+    // isn't in the list; write the first model into the form so what's shown is what gets validated and saved.
+    const { setValue, getValues } = useFormContext<RavenBot>()
+    const validModelsKey = validModels.join("\n")
+    useEffect(() => {
+        if (!isAiBot || !modelProvider || modelProvider === "OpenAI" || !validModelsKey) return
+        if (!validModelsKey.split("\n").includes(getValues("model") ?? "")) {
+            setValue("model", validModelsKey.split("\n")[0], { shouldDirty: true })
+        }
+    }, [isAiBot, modelProvider, validModelsKey, getValues, setValue])
+
+    if (!isAiBot) return null
 
     return (
         <FormField
@@ -199,4 +225,4 @@ const ReasoningEffortSelector = () => {
     )
 }
 
-export { ModelProviderSelector, ModelSelector, ReasoningEffortSelector }
+export { ModelProviderSelector, ModelSelector, ReasoningEffortSelector, useModelProvider }

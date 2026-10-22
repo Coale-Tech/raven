@@ -1,5 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from "react"
-import { useFrappePostCall, type Filter, type FrappeError } from "frappe-react-sdk"
+import { useEffect, useState, type FormEvent, type ReactNode } from "react"
+import { useFrappeGetCall, useFrappePostCall, type Filter, type FrappeError } from "frappe-react-sdk"
 import { XIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
@@ -14,10 +14,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@components/ui/dialog"
-import { errorResponseToast } from "@components/ui/error-banner"
+import ErrorBanner, { errorResponseToast } from "@components/ui/error-banner"
 import { Input } from "@components/ui/input"
 import { Label } from "@components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select"
+import { Spinner } from "@components/ui/spinner"
 import { Textarea } from "@components/ui/textarea"
 import _ from "@lib/translate"
 
@@ -46,6 +47,41 @@ type Form = {
     raven_customer_facing: boolean
     description: string
 }
+
+const EMPTY: Form = {
+    subject: "",
+    status: "Open",
+    priority: "Medium",
+    type: "",
+    assignees: [],
+    exp_start_date: "",
+    exp_end_date: "",
+    review_date: "",
+    expected_time: "",
+    task_weight: "",
+    progress: "",
+    parent_task: "",
+    depends_on: [],
+    issue: "",
+    department: "",
+    color: "",
+    is_group: false,
+    is_milestone: false,
+    raven_customer_facing: false,
+    description: "",
+}
+
+/** Server task → form state: nulls become "", datetimes become `datetime-local` values. */
+const toForm = (t: Record<string, unknown>): Form =>
+    Object.fromEntries(
+        Object.entries(EMPTY).map(([k, empty]) => {
+            const v = t[k]
+            if (v == null) return [k, empty]
+            if (typeof empty === "boolean") return [k, !!v]
+            if (Array.isArray(empty)) return [k, v]
+            return [k, k.startsWith("exp_") ? String(v).slice(0, 16).replace(" ", "T") : String(v)]
+        }),
+    ) as Form
 
 export const Field = ({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) => (
     <div className="flex flex-col gap-1.5">
@@ -98,50 +134,47 @@ export function MultiLink({
 }
 
 /**
- * Project Hub → Tasks: the per-column "add task" modal. Captures every editable Task field
+ * Project Hub → Tasks: the task modal. Without `task` it is the per-column "add task" form; with `task`
+ * it loads and edits that task in place (no Desk redirect). Captures every editable Task field
  * (the read-only actuals and tree internals are computed by ERPNext) plus assignees.
  */
 export default function CreateTaskDialog({
     project,
-    status,
+    status = "Open",
+    task,
     open,
     onOpenChange,
-    onCreated,
+    onSaved,
 }: {
     project: string
     /** Column the dialog was opened from — pins the new task's initial status. */
-    status: string
+    status?: string
+    /** Existing task to view/edit; omit to create. */
+    task?: string
     open: boolean
     onOpenChange: (open: boolean) => void
-    onCreated: () => void
+    onSaved: () => void
 }) {
-    const { call: createTask, loading, reset } = useFrappePostCall<{ message: string }>(
-        "raven.api.project_tabs.create_task",
+    const { call: save, loading, reset } = useFrappePostCall(
+        task ? "raven.api.project_tabs.update_task" : "raven.api.project_tabs.create_task",
     )
-    const initial: Form = {
-        subject: "",
-        status,
-        priority: "Medium",
-        type: "",
-        assignees: [],
-        exp_start_date: "",
-        exp_end_date: "",
-        review_date: "",
-        expected_time: "",
-        task_weight: "",
-        progress: "",
-        parent_task: "",
-        depends_on: [],
-        issue: "",
-        department: "",
-        color: "",
-        is_group: false,
-        is_milestone: false,
-        raven_customer_facing: false,
-        description: "",
-    }
+    const { data: loaded, error: loadError } = useFrappeGetCall<{ message: Record<string, unknown> }>(
+        "raven.api.project_tabs.get_task",
+        { task },
+        task ? ["task_detail", task] : null,
+        { revalidateOnFocus: false, revalidateOnReconnect: false },
+    )
+    const initial: Form = { ...EMPTY, status }
     const [form, setForm] = useState<Form>(initial)
     const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }))
+    // The form mounts only once the task is applied: a Radix Select that gains its value after mount
+    // (e.g. a legacy status such as Overdue) resets itself to "".
+    const [ready, setReady] = useState(!task)
+    useEffect(() => {
+        if (!loaded) return
+        setForm(toForm(loaded.message))
+        setReady(true)
+    }, [loaded])
 
     const handleOpenChange = (next: boolean) => {
         if (!next) {
@@ -155,20 +188,40 @@ export default function CreateTaskDialog({
         e.preventDefault()
         if (!form.subject.trim()) return
         const { subject, assignees, ...rest } = form
+        const done = () => {
+            onSaved()
+            handleOpenChange(false)
+        }
+        if (task && loaded) {
+            // Send only what changed (empty clears a field). Resaving the untouched description would
+            // flatten rich text (it is shown as plain text), and legacy statuses like Overdue are not
+            // in the status whitelist.
+            const original = toForm(loaded.message)
+            const changed: Record<string, unknown> = Object.fromEntries(
+                Object.entries(rest).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(original[k as keyof Form])),
+            )
+            if (typeof changed.description === "string") changed.description = changed.description.trim()
+            save({
+                task,
+                subject: subject.trim(),
+                fields: changed,
+                assign_to_users: JSON.stringify(assignees) !== JSON.stringify(original.assignees) ? assignees : undefined,
+            })
+                .then(done)
+                .catch((err: FrappeError) => errorResponseToast(_("Could not update task"), err))
+            return
+        }
         // Only send what was filled in; ERPNext supplies its own defaults for the rest.
         const fields = Object.fromEntries(
             Object.entries(rest).filter(([, v]) => (Array.isArray(v) ? v.length > 0 : v !== "" && v !== false)),
         )
-        createTask({
+        save({
             project,
             subject: subject.trim(),
             fields: { ...fields, description: form.description.trim() || undefined },
             assign_to: assignees.length ? assignees : undefined,
         })
-            .then(() => {
-                onCreated()
-                handleOpenChange(false)
-            })
+            .then(done)
             .catch((err: FrappeError) => errorResponseToast(_("Could not create task"), err))
     }
 
@@ -179,12 +232,19 @@ export default function CreateTaskDialog({
             <DialogContent className="sm:max-w-2xl">
                 <form onSubmit={onSubmit} className="flex min-h-0 flex-col gap-4">
                     <DialogHeader>
-                        <DialogTitle>{_("Add task")}</DialogTitle>
+                        <DialogTitle>{task ? _("Edit task") : _("Add task")}</DialogTitle>
                         <DialogDescription className="sr-only">
-                            {_("Create a task in this project and column.")}
+                            {task ? _("View and edit this task.") : _("Create a task in this project and column.")}
                         </DialogDescription>
                     </DialogHeader>
 
+                    {!ready && (
+                        <div className="flex justify-center p-4">
+                            {loadError ? <ErrorBanner error={loadError} /> : <Spinner />}
+                        </div>
+                    )}
+
+                    {ready && (
                     <DialogBody className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto">
                         <Field label={_("Title")} htmlFor="task-subject">
                             <Input
@@ -203,7 +263,7 @@ export default function CreateTaskDialog({
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {STATUS_OPTIONS.map((s) => (
+                                        {[...STATUS_OPTIONS, ...(form.status && !STATUS_OPTIONS.some((o) => o === form.status) ? [form.status] : [])].map((s) => (
                                             <SelectItem key={s} value={s}>
                                                 {_(s)}
                                             </SelectItem>
@@ -382,13 +442,14 @@ export default function CreateTaskDialog({
                             />
                         </Field>
                     </DialogBody>
+                    )}
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={loading}>
                             {_("Cancel")}
                         </Button>
-                        <Button type="submit" loading={loading} disabled={!form.subject.trim()}>
-                            {_("Add task")}
+                        <Button type="submit" loading={loading} disabled={!form.subject.trim() || !ready}>
+                            {task ? _("Save") : _("Add task")}
                         </Button>
                     </DialogFooter>
                 </form>

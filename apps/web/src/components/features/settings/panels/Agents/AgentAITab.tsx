@@ -9,7 +9,7 @@ import { Switch } from "@components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@components/ui/tooltip"
 import { useRavenSettings } from "@hooks/fetchers/useRavenSettings"
 import type { RavenBot } from "@raven/types/RavenBot/RavenBot"
-import { ModelProviderSelector, ModelSelector, ReasoningEffortSelector } from "./AgentModelFields"
+import { ModelProviderSelector, ModelSelector, ReasoningEffortSelector, useModelProvider } from "./AgentModelFields"
 import _ from "@lib/translate"
 
 /** AI tab of the Raven Bot editor. */
@@ -17,7 +17,7 @@ const AgentAITab = () => {
     const { control } = useFormContext<RavenBot>()
     const { ravenSettings } = useRavenSettings()
     const openAIAssistantID = useWatch({ control, name: "openai_assistant_id" })
-    const modelProvider = useWatch({ control, name: "model_provider" })
+    const modelProvider = useModelProvider()
     const isAiBot = useWatch({ control, name: "is_ai_bot" })
 
     const isLocalLLM = modelProvider === "Local LLM"

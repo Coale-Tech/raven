@@ -68,6 +68,7 @@ export default function TasksTab({ project }: { project: string }) {
             .catch((e: FrappeError) => errorResponseToast(_("Could not update task"), e))
 
     const [addTaskStatus, setAddTaskStatus] = useState<string | null>(null)
+    const [openTask, setOpenTask] = useState<string | null>(null)
     const [sendTask, setSendTask] = useState<string | null>(null)
     const [dragOverStatus, setDragOverStatus] = useState<string | null>(null)
 
@@ -139,14 +140,13 @@ export default function TasksTab({ project }: { project: string }) {
                                         onDragStart={(e) => e.dataTransfer.setData("text/plain", task.name)}
                                         className="flex cursor-grab flex-col gap-2 rounded-md border border-outline-gray-2 bg-surface-base p-2.5 shadow-xs active:cursor-grabbing"
                                     >
-                                        <a
-                                            href={`/app/task/${encodeURIComponent(task.name)}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="line-clamp-2 text-sm font-medium text-ink-gray-9 hover:underline"
+                                        <button
+                                            type="button"
+                                            onClick={() => setOpenTask(task.name)}
+                                            className="line-clamp-2 text-left text-sm font-medium text-ink-gray-9 hover:underline"
                                         >
                                             {task.subject}
-                                        </a>
+                                        </button>
                                         <div className="flex items-center gap-2">
                                             <Badge variant="subtle">{_(task.priority)}</Badge>
                                             {task.exp_end_date && (
@@ -205,13 +205,19 @@ export default function TasksTab({ project }: { project: string }) {
                     )
                 })}
             </div>
-            {addTaskStatus && (
+            {(addTaskStatus || openTask) && (
                 <CreateTaskDialog
                     project={project}
-                    status={addTaskStatus}
+                    status={addTaskStatus ?? undefined}
+                    task={openTask ?? undefined}
                     open
-                    onOpenChange={(open) => !open && setAddTaskStatus(null)}
-                    onCreated={mutate}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setAddTaskStatus(null)
+                            setOpenTask(null)
+                        }
+                    }}
+                    onSaved={mutate}
                 />
             )}
             {sendTask && (

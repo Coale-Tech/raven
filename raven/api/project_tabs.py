@@ -1,6 +1,11 @@
+import html
+import re
+
 import frappe
 from frappe import _
+from frappe.desk.form import assign_to as todo
 from frappe.utils import cint
+from frappe.utils.data import strip_html
 from frappe.utils.html_utils import clean_html
 
 from raven.raven_integrations.project.github import fetch_changelog
@@ -70,11 +75,7 @@ def get_tasks(project: str) -> list[dict]:
 	)
 
 
-@frappe.whitelist(methods=["POST"])
-def create_task(project: str, subject: str, fields: dict | str | None = None, assign_to: list | str | None = None) -> str:
-	"""Create a Task; `fields` is limited to TASK_CREATE_FIELDS, `assign_to` is a list of users (ToDo + notification)."""
-	_check(project)
-	frappe.has_permission("Task", "create", throw=True)
+def _clean_task_fields(fields: dict | str | None) -> dict:
 	fields = frappe.parse_json(fields) or {}
 	if unknown := set(fields) - set(TASK_CREATE_FIELDS):
 		frappe.throw(_("Field(s) not allowed here: {0}").format(", ".join(sorted(unknown))))
@@ -82,6 +83,15 @@ def create_task(project: str, subject: str, fields: dict | str | None = None, as
 		frappe.throw(_("Invalid status {0}").format(fields["status"]))
 	if fields.get("description"):
 		fields["description"] = frappe.utils.escape_html(fields["description"]).replace("\n", "<br>")
+	return fields
+
+
+@frappe.whitelist(methods=["POST"])
+def create_task(project: str, subject: str, fields: dict | str | None = None, assign_to: list | str | None = None) -> str:
+	"""Create a Task; `fields` is limited to TASK_CREATE_FIELDS, `assign_to` is a list of users (ToDo + notification)."""
+	_check(project)
+	frappe.has_permission("Task", "create", throw=True)
+	fields = _clean_task_fields(fields)
 	depends_on = [{"task": t} for t in fields.pop("depends_on", None) or []]
 
 	doc = frappe.get_doc(
@@ -94,6 +104,42 @@ def create_task(project: str, subject: str, fields: dict | str | None = None, as
 
 		add({"doctype": "Task", "name": doc.name, "assign_to": users})
 	return doc.name
+
+
+@frappe.whitelist()
+def get_task(task: str) -> dict:
+	"""Everything the in-app task dialog edits. The description is returned as plain text."""
+	doc = frappe.get_doc("Task", task)
+	doc.check_permission("read")
+	out = {f: doc.get(f) for f in ("subject", *TASK_CREATE_FIELDS) if f not in ("depends_on", "description")}
+	out["depends_on"] = [d.task for d in doc.depends_on]
+	out["assignees"] = [a.owner for a in todo.get({"doctype": "Task", "name": task})]
+	text = re.sub(r"<br\s*/?>|</(p|div|li)>", "\n", doc.description or "")
+	out["description"] = html.unescape(strip_html(text)).strip()
+	return out
+
+
+@frappe.whitelist(methods=["POST"])
+def update_task(task: str, subject: str, fields: dict | str | None = None, assign_to_users: list | str | None = None) -> None:
+	"""Update a Task from the in-app dialog. Same field whitelist as create_task; empty strings clear a field.
+	Send `description` only if it was edited (it is shown as plain text, so resaving would flatten rich text)."""
+	doc = frappe.get_doc("Task", task)
+	doc.check_permission("write")
+	fields = _clean_task_fields(fields)
+	depends_on = fields.pop("depends_on", None)
+	doc.update({k: None if v == "" else v for k, v in fields.items()})
+	doc.subject = subject
+	if depends_on is not None:
+		doc.set("depends_on", [{"task": t} for t in depends_on])
+	doc.save()
+
+	if assign_to_users is not None:
+		wanted = set(frappe.parse_json(assign_to_users))
+		current = {a.owner for a in todo.get({"doctype": "Task", "name": task})}
+		for user in current - wanted:
+			todo.remove("Task", task, user)
+		if wanted - current:
+			todo.add({"doctype": "Task", "name": task, "assign_to": list(wanted - current)})
 
 
 @frappe.whitelist(methods=["POST"])
