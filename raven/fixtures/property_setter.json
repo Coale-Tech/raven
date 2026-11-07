@@ -1,0 +1,18 @@
+[
+ {
+  "default_value": null,
+  "doc_type": "Task",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocType",
+  "field_name": null,
+  "is_system_generated": 1,
+  "modified": "2026-11-07 09:08:31.080583",
+  "module": null,
+  "name": "Task-main-track_changes",
+  "property": "track_changes",
+  "property_type": "Check",
+  "row_name": null,
+  "value": "1"
+ }
+]

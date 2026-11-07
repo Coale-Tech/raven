@@ -28,3 +28,4 @@ raven.patches.v3_0.mark_existing_sites_set_up
 raven.patches.v3_0.create_role_profiles
 raven.patches.v3_0.migrate_github_repos_to_table
 raven.patches.v3_0.create_project_drive_folders
+raven.patches.v3_0.add_project_task_context

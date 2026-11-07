@@ -10,6 +10,14 @@ source_link = "https://github.com/frappe/Raven"
 app_logo = "/assets/raven/raven_logo.svg"
 app_logo_url = "/assets/raven/raven_logo.svg"
 
+fixtures = [
+	{"dt": "Custom Field", "filters": [["name", "in", [
+		"Task-raven_blocker_kind", "Task-raven_blocker_reason", "Task-raven_blocker_owner",
+		"Task-raven_acceptance_criteria", "Task-raven_review_handoff",
+	]]]},
+	{"dt": "Property Setter", "filters": [["name", "=", "Task-main-track_changes"]]},
+]
+
 # Includes in <head>
 # ------------------
 
@@ -97,6 +105,7 @@ setup_wizard_success = "raven.frappe_cloud_push.queue_initial_push_setup"
 after_migrate = [
 	"raven.install.add_customer_statement_to_selling_sidebar",
 	"raven.raven_integrations.project.setup.add_task_customer_facing_field",
+	"raven.raven_integrations.project.setup.add_task_context_fields",
 ]
 # after_sync = ""
 
@@ -167,6 +176,7 @@ doc_events = {
 	},
 	"Task": {
 		"after_insert": "raven.raven_integrations.controllers.task.after_insert",
+		"validate": "raven.raven_integrations.project.tasks.validate_task_context",
 		"on_update": "raven.raven_integrations.controllers.task.on_update",
 	},
 	"Issue": {

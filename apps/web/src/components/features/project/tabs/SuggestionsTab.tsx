@@ -51,7 +51,7 @@ export default function SuggestionsTab({ project }: { project: string }) {
     // An approval creates a Task/Issue/Note elsewhere in the Hub.
     const refresh = () => {
         mutate()
-        for (const key of ["project_tasks", "project_issues", "project_notes", "project_overview"]) globalMutate([key, project])
+        globalMutate(key => Array.isArray(key) && key[1] === project && ["project_tasks", "project_issues", "project_notes", "project_overview"].includes(String(key[0])))
     }
 
     return (

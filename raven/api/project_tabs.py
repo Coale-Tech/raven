@@ -1,17 +1,12 @@
-import html
-import re
-
 import frappe
 from frappe import _
-from frappe.desk.form import assign_to as todo
 from frappe.utils import cint
-from frappe.utils.data import strip_html
 from frappe.utils.html_utils import clean_html
 
 from raven.raven_integrations.project.github import fetch_changelog
 from raven.raven_integrations.project.drive import folder_for_project
 
-TASK_STATUSES = ("Open", "Working", "Pending Review", "Completed", "Cancelled")
+from raven.raven_integrations.project import task_activity, task_board, tasks as task_service
 TASK_CREATE_FIELDS = (
 	"status",
 	"priority",
@@ -31,6 +26,7 @@ TASK_CREATE_FIELDS = (
 	"depends_on",
 	"description",
 	"raven_customer_facing",
+	"raven_acceptance_criteria",
 )
 
 ISSUE_STATUSES = ("Open", "Replied", "On Hold", "Resolved", "Closed")
@@ -53,104 +49,117 @@ def _check(project: str) -> None:
 
 
 @frappe.whitelist()
-def get_tasks(project: str) -> list[dict]:
-	_check(project)
-	return frappe.get_list(
-		"Task",
-		filters={"project": project},
-		fields=[
-			"name",
-			"subject",
-			"status",
-			"priority",
-			"exp_end_date",
-			"progress",
-			"_assign",
-			"parent_task",
-			"is_group",
-			"raven_customer_facing",
-		],
-		order_by="modified desc",
-		limit_page_length=200,
-	)
+def get_tasks(project: str, q: str = "", mine: bool = False, unassigned: bool = False, overdue: bool = False, priority: str | None = None, customer_facing: bool = False, sort: str = "priority", view: str = "tasks", lane: str | None = None, start: int = 0, page_length: int = 30) -> dict:
+	return task_board.get_board(project, q, mine, unassigned, overdue, priority, customer_facing, sort, view, lane, start, page_length)
 
 
-def _clean_task_fields(fields: dict | str | None) -> dict:
-	fields = frappe.parse_json(fields) or {}
-	if unknown := set(fields) - set(TASK_CREATE_FIELDS):
+def _clean_task_fields(fields: dict | str | None, creating: bool = False) -> dict:
+	fields = frappe.parse_json(fields) if fields is not None else {}
+	if not isinstance(fields, dict):
+		frappe.throw(_("Task fields must be an object"))
+	allowed = set(TASK_CREATE_FIELDS) - (set() if creating else {"status"})
+	if unknown := set(fields) - allowed:
 		frappe.throw(_("Field(s) not allowed here: {0}").format(", ".join(sorted(unknown))))
-	if fields.get("status", "Open") not in TASK_STATUSES:
-		frappe.throw(_("Invalid status {0}").format(fields["status"]))
-	if fields.get("description"):
-		fields["description"] = frappe.utils.escape_html(fields["description"]).replace("\n", "<br>")
+	if creating and fields.get("status", "Open") not in ("Open", "Working"):
+		frappe.throw(_("Create an Open task; use task actions for review or completion"))
+	if "priority" in fields and fields["priority"] not in ("Low", "Medium", "High", "Urgent"):
+		frappe.throw(_("Invalid priority"))
+	for key, value in fields.items():
+		if key == "depends_on":
+			if not isinstance(value, list) or len(value) > 100 or any(not isinstance(name, str) for name in value):
+				frappe.throw(_("Choose at most 100 task dependencies"))
+		elif isinstance(value, (dict, list)):
+			frappe.throw(_("Invalid value for {0}").format(key))
+	if "description" in fields:
+		value = task_service.text(fields["description"] or "", _("Description"), 100000, required=False)
+		fields["description"] = frappe.utils.escape_html(value).replace("\n", "<br>")
 	return fields
 
 
 @frappe.whitelist(methods=["POST"])
 def create_task(project: str, subject: str, fields: dict | str | None = None, assign_to: list | str | None = None) -> str:
-	"""Create a Task; `fields` is limited to TASK_CREATE_FIELDS, `assign_to` is a list of users (ToDo + notification)."""
 	_check(project)
 	frappe.has_permission("Task", "create", throw=True)
-	fields = _clean_task_fields(fields)
-	depends_on = [{"task": t} for t in fields.pop("depends_on", None) or []]
-
-	doc = frappe.get_doc(
-		{"doctype": "Task", "project": project, "subject": subject, "depends_on": depends_on, **fields}
-	)
+	fields = _clean_task_fields(fields, creating=True)
+	dependencies = fields.pop("depends_on", [])
+	doc = frappe.get_doc({"doctype": "Task", "project": project, "subject": task_service.text(subject, _("Title"), 140), **fields})
+	doc.set("depends_on", [{"task": name} for name in dependencies])
+	if doc.status == "Working" and not task_service.dependency_state(doc)["ready"]:
+		frappe.throw(_("Resolve blockers and dependencies before starting work"))
+	users = frappe.parse_json(assign_to) if assign_to is not None else []
+	if not isinstance(users, list) or any(not task_service.eligible_user(user, doc) for user in users):
+		frappe.throw(_("Choose eligible assignees"))
 	doc.insert()
-
-	if users := frappe.parse_json(assign_to):
-		from frappe.desk.form.assign_to import add
-
-		add({"doctype": "Task", "name": doc.name, "assign_to": users})
+	if users:
+		task_service.set_assignments(doc, users)
 	return doc.name
 
 
 @frappe.whitelist()
 def get_task(task: str) -> dict:
-	"""Everything the in-app task dialog edits. The description is returned as plain text."""
-	doc = frappe.get_doc("Task", task)
-	doc.check_permission("read")
-	out = {f: doc.get(f) for f in ("subject", *TASK_CREATE_FIELDS) if f not in ("depends_on", "description")}
-	out["depends_on"] = [d.task for d in doc.depends_on]
-	out["assignees"] = [a.owner for a in todo.get({"doctype": "Task", "name": task})]
-	text = re.sub(r"<br\s*/?>|</(p|div|li)>", "\n", doc.description or "")
-	out["description"] = html.unescape(strip_html(text)).strip()
-	return out
+	return task_activity.detail(task, TASK_CREATE_FIELDS)
+
+
+@frappe.whitelist()
+def get_task_relations(task: str, kind: str = "children", start: int = 0, page_length: int = 30) -> dict:
+	return task_activity.relations(task, kind, start, page_length)
+
+
+@frappe.whitelist()
+def get_task_updates(task: str, kind: str = "discussion", start: int = 0, page_length: int = 30) -> dict:
+	return task_activity.updates(task, kind, start, page_length)
+
+
+@frappe.whitelist()
+def get_task_assignees(task: str | None = None, project: str | None = None, q: str = "", start: int = 0, page_length: int = 20) -> dict:
+	return task_activity.assignees(task, project, q, start, page_length)
 
 
 @frappe.whitelist(methods=["POST"])
-def update_task(task: str, subject: str, fields: dict | str | None = None, assign_to_users: list | str | None = None) -> None:
-	"""Update a Task from the in-app dialog. Same field whitelist as create_task; empty strings clear a field.
-	Send `description` only if it was edited (it is shown as plain text, so resaving would flatten rich text)."""
-	doc = frappe.get_doc("Task", task)
-	doc.check_permission("write")
+def set_task_assignees(task: str, users: list[str], expected_modified: str) -> dict:
+	doc = task_service.require_task(task, "write", for_update=True)
+	task_service.check_version(doc, expected_modified)
+	task_service.set_assignments(doc, users)
+	return get_task(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def task_action(task: str, action: str, expected_modified: str, payload: dict | None = None) -> dict:
+	doc = task_service.perform_action(task, action, expected_modified, payload)
+	return get_task(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def add_task_comment(task: str, content: str) -> dict:
+	return task_activity.add_comment(task, content)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_task(task: str, subject: str, fields: dict | str | None = None, assign_to_users: list | str | None = None, *, expected_modified: str) -> dict:
+	doc = task_service.require_task(task, "write", for_update=True)
+	task_service.check_version(doc, expected_modified)
 	fields = _clean_task_fields(fields)
 	depends_on = fields.pop("depends_on", None)
-	doc.update({k: None if v == "" else v for k, v in fields.items()})
-	doc.subject = subject
+	doc.update({key: None if value == "" else value for key, value in fields.items()})
+	doc.subject = task_service.text(subject, _("Title"), 140)
 	if depends_on is not None:
-		doc.set("depends_on", [{"task": t} for t in depends_on])
+		doc.set("depends_on", [{"task": name} for name in depends_on])
 	doc.save()
-
 	if assign_to_users is not None:
-		wanted = set(frappe.parse_json(assign_to_users))
-		current = {a.owner for a in todo.get({"doctype": "Task", "name": task})}
-		for user in current - wanted:
-			todo.remove("Task", task, user)
-		if wanted - current:
-			todo.add({"doctype": "Task", "name": task, "assign_to": list(wanted - current)})
+		task_service.set_assignments(doc, frappe.parse_json(assign_to_users))
+	return get_task(doc.name)
 
 
 @frappe.whitelist(methods=["POST"])
-def set_task_status(task: str, status: str) -> None:
-	frappe.has_permission("Task", "write", task, throw=True)
-	if status not in TASK_STATUSES:
-		frappe.throw(_("Invalid status {0}").format(status))
+def suggest_subtasks(task: str, instructions: str = "") -> dict:
+	from raven.raven_integrations.project.task_suggestions import suggest
+	return suggest(task, instructions)
 
-	doc = frappe.get_doc("Task", task)
-	doc.status = status
-	doc.save()
+
+@frappe.whitelist(methods=["POST"])
+def create_subtasks(task: str, rows: list[dict], expected_modified: str, convert_to_group: bool = False) -> dict:
+	from raven.raven_integrations.project.task_suggestions import create
+	return create(task, rows, expected_modified, convert_to_group)
 
 
 @frappe.whitelist()

@@ -3,13 +3,13 @@ import { Drawer as DrawerPrimitive } from "vaul"
 import { cn } from "@lib/utils"
 import { useHistoryBackClose } from "@hooks/useHistoryBackClose"
 
-type OpenProps = { open?: boolean; defaultOpen?: boolean; onOpenChange?: (open: boolean) => void }
+type OpenProps = { open?: boolean; defaultOpen?: boolean; onOpenChange?: (open: boolean) => void; historyManaged?: boolean }
 
 /**
  * Open state for every sheet, controlled by the caller or by its trigger, so the
  * back button/gesture closes the sheet instead of leaving the page (useHistoryBackClose).
  */
-const useSheetOpen = ({ open: openProp, defaultOpen, onOpenChange }: OpenProps) => {
+const useSheetOpen = ({ open: openProp, defaultOpen, onOpenChange, historyManaged = false }: OpenProps) => {
     const [openState, setOpenState] = React.useState(defaultOpen ?? false)
     const open = openProp ?? openState
     const setOpen = React.useCallback(
@@ -19,14 +19,14 @@ const useSheetOpen = ({ open: openProp, defaultOpen, onOpenChange }: OpenProps) 
         },
         [openProp, onOpenChange],
     )
-    useHistoryBackClose(open, () => setOpen(false))
+    useHistoryBackClose(open && !historyManaged, () => setOpen(false))
     return { open, onOpenChange: setOpen }
 }
 
-function Drawer({ open, defaultOpen, onOpenChange, ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
+function Drawer({ open, defaultOpen, onOpenChange, historyManaged = false, ...props }: React.ComponentProps<typeof DrawerPrimitive.Root> & { /** The caller already represents this sheet in router history. */ historyManaged?: boolean }) {
     // vaul's Safari-toolbar fix (body position:fixed on open) shifts the whole app in a WebView.
     // vaul only skips it for installed PWAs (display-mode:standalone); this skips it for the WebView too.
-    return <DrawerPrimitive.Root data-slot="drawer" noBodyStyles={!!import.meta.env.VITE_NATIVE} {...props} {...useSheetOpen({ open, defaultOpen, onOpenChange })} />
+    return <DrawerPrimitive.Root data-slot="drawer" noBodyStyles={!!import.meta.env.VITE_NATIVE} {...props} {...useSheetOpen({ open, defaultOpen, onOpenChange, historyManaged })} />
 }
 
 /**

@@ -21,8 +21,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@components/ui/spinner"
 import { Textarea } from "@components/ui/textarea"
 import _ from "@lib/translate"
+import TaskAssigneePicker from "../TaskAssigneePicker"
+import TaskFileQueue, { useTaskFileQueue } from "../TaskFileQueue"
+import type { TaskUploadPolicy } from "../taskUploads"
+import { taskPermalink } from "../taskBoard"
 
-const STATUS_OPTIONS = ["Open", "Working", "Pending Review", "Completed", "Cancelled"] as const
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Urgent"] as const
 
 type Form = {
@@ -46,6 +49,7 @@ type Form = {
     is_milestone: boolean
     raven_customer_facing: boolean
     description: string
+    raven_acceptance_criteria: string
 }
 
 const EMPTY: Form = {
@@ -69,13 +73,14 @@ const EMPTY: Form = {
     is_milestone: false,
     raven_customer_facing: false,
     description: "",
+    raven_acceptance_criteria: "",
 }
 
 /** Server task → form state: nulls become "", datetimes become `datetime-local` values. */
 const toForm = (t: Record<string, unknown>): Form =>
     Object.fromEntries(
         Object.entries(EMPTY).map(([k, empty]) => {
-            const v = t[k]
+            const v = t[k === "assignees" ? "assignee_users" : k]
             if (v == null) return [k, empty]
             if (typeof empty === "boolean") return [k, !!v]
             if (Array.isArray(empty)) return [k, v]
@@ -145,6 +150,8 @@ export default function CreateTaskDialog({
     open,
     onOpenChange,
     onSaved,
+    uploadPolicy,
+    parentTask,
 }: {
     project: string
     /** Column the dialog was opened from — pins the new task's initial status. */
@@ -154,29 +161,38 @@ export default function CreateTaskDialog({
     open: boolean
     onOpenChange: (open: boolean) => void
     onSaved: () => void
+    uploadPolicy: TaskUploadPolicy
+    parentTask?: string
 }) {
     const { call: save, loading, reset } = useFrappePostCall(
         task ? "raven.api.project_tabs.update_task" : "raven.api.project_tabs.create_task",
     )
-    const { data: loaded, error: loadError } = useFrappeGetCall<{ message: Record<string, unknown> }>(
+    const { data: loaded, error: loadError, mutate: refreshTask } = useFrappeGetCall<{ message: Record<string, unknown> }>(
         "raven.api.project_tabs.get_task",
         { task },
-        task ? ["task_detail", task] : null,
+        task ? ["task_detail", project, task] : null,
         { revalidateOnFocus: false, revalidateOnReconnect: false },
     )
-    const initial: Form = { ...EMPTY, status }
+    const initial: Form = { ...EMPTY, status: ["Open", "Working"].includes(status) ? status : "Open", parent_task: parentTask ?? "" }
     const [form, setForm] = useState<Form>(initial)
     const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }))
     // The form mounts only once the task is applied: a Radix Select that gains its value after mount
     // (e.g. a legacy status such as Overdue) resets itself to "".
     const [ready, setReady] = useState(!task)
+    const [createdTask, setCreatedTask] = useState<string | null>(null)
+    const [baseline, setBaseline] = useState<Record<string, unknown> | null>(null)
+    const [submitError, setSubmitError] = useState<FrappeError | null>(null)
+    const queue = useTaskFileQueue(null, uploadPolicy)
+    const busy = loading || queue.busy
     useEffect(() => {
-        if (!loaded) return
+        if (!loaded || baseline) return
         setForm(toForm(loaded.message))
+        setBaseline(loaded.message)
         setReady(true)
-    }, [loaded])
+    }, [loaded, baseline])
 
     const handleOpenChange = (next: boolean) => {
+        if (busy) return
         if (!next) {
             setForm(initial)
             reset()
@@ -186,19 +202,20 @@ export default function CreateTaskDialog({
 
     const onSubmit = (e: FormEvent) => {
         e.preventDefault()
-        if (!form.subject.trim()) return
+        if (!form.subject.trim() || createdTask || busy) return
+        setSubmitError(null)
         const { subject, assignees, ...rest } = form
         const done = () => {
             onSaved()
             handleOpenChange(false)
         }
-        if (task && loaded) {
+        if (task && baseline) {
             // Send only what changed (empty clears a field). Resaving the untouched description would
             // flatten rich text (it is shown as plain text), and legacy statuses like Overdue are not
             // in the status whitelist.
-            const original = toForm(loaded.message)
+            const original = toForm(baseline)
             const changed: Record<string, unknown> = Object.fromEntries(
-                Object.entries(rest).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(original[k as keyof Form])),
+                Object.entries(rest).filter(([k, v]) => k !== "status" && JSON.stringify(v) !== JSON.stringify(original[k as keyof Form])),
             )
             if (typeof changed.description === "string") changed.description = changed.description.trim()
             save({
@@ -206,9 +223,10 @@ export default function CreateTaskDialog({
                 subject: subject.trim(),
                 fields: changed,
                 assign_to_users: JSON.stringify(assignees) !== JSON.stringify(original.assignees) ? assignees : undefined,
+                expected_modified: baseline.modified,
             })
                 .then(done)
-                .catch((err: FrappeError) => errorResponseToast(_("Could not update task"), err))
+                .catch((err: FrappeError) => { setSubmitError(err); errorResponseToast(_("Could not update task"), err); void refreshTask() })
             return
         }
         // Only send what was filled in; ERPNext supplies its own defaults for the rest.
@@ -220,9 +238,12 @@ export default function CreateTaskDialog({
             subject: subject.trim(),
             fields: { ...fields, description: form.description.trim() || undefined },
             assign_to: assignees.length ? assignees : undefined,
-        })
-            .then(done)
-            .catch((err: FrappeError) => errorResponseToast(_("Could not create task"), err))
+        }).then(async (response: { message: string }) => {
+            setCreatedTask(response.message)
+            await queue.uploadAll(response.message)
+            onSaved()
+            if (queue.state.items.length === 0) onOpenChange(false)
+        }).catch((err: FrappeError) => { setSubmitError(err); errorResponseToast(_("Could not create task"), err) })
     }
 
     const projectFilter: Filter[] = [["project", "=", project]]
@@ -246,10 +267,19 @@ export default function CreateTaskDialog({
 
                     {ready && (
                     <DialogBody className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto">
+                        {submitError && <ErrorBanner error={submitError} />}
+                        {baseline && loaded && baseline.modified !== loaded.message.modified && <div role="alert" className="rounded border border-outline-amber-2 p-3 text-sm"><p>{_("This task changed elsewhere. Your unsaved edits are preserved. Review the latest version before saving.")}</p><Button type="button" variant="outline" onClick={() => {
+                            const original = toForm(baseline), latest = toForm(loaded.message)
+                            setForm(current => Object.fromEntries(Object.entries(current).map(([key, value]) => [key, JSON.stringify(value) === JSON.stringify(original[key as keyof Form]) ? latest[key as keyof Form] : value])) as Form)
+                            setBaseline(loaded.message)
+                            setSubmitError(null)
+                        }}>{_("Use latest version, keep my edits")}</Button></div>}
+                        <fieldset disabled={busy || !!createdTask} className="contents">
                         <Field label={_("Title")} htmlFor="task-subject">
                             <Input
                                 id="task-subject"
                                 autoFocus
+                                maxLength={140}
                                 value={form.subject}
                                 onChange={(e) => set("subject", e.target.value)}
                                 placeholder={_("What needs to be done?")}
@@ -258,18 +288,7 @@ export default function CreateTaskDialog({
 
                         <div className="grid grid-cols-2 gap-3">
                             <Field label={_("Status")}>
-                                <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                                    <SelectTrigger inputSize="md">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {[...STATUS_OPTIONS, ...(form.status && !STATUS_OPTIONS.some((o) => o === form.status) ? [form.status] : [])].map((s) => (
-                                            <SelectItem key={s} value={s}>
-                                                {_(s)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <p className="text-sm text-ink-gray-7">{_(form.status)} · {_("Use task actions to change status")}</p>
                             </Field>
                             <Field label={_("Priority")}>
                                 <Select value={form.priority} onValueChange={(v) => set("priority", v)}>
@@ -288,13 +307,13 @@ export default function CreateTaskDialog({
                         </div>
 
                         <Field label={_("Assign to")}>
-                            <MultiLink
-                                doctype="User"
-                                values={form.assignees}
-                                onChange={(v) => set("assignees", v)}
-                                placeholder={_("Add assignee")}
-                            />
+                            <TaskAssigneePicker task={task} project={task ? undefined : project} value={form.assignees} onChange={v => set("assignees", v)} />
                         </Field>
+                        <Field label={_("Due (site time)")} htmlFor="task-quick-due">
+                            <Input id="task-quick-due" type="datetime-local" value={form.exp_end_date} onChange={e => set("exp_end_date", e.target.value)} />
+                        </Field>
+                        <details className="flex flex-col gap-3">
+                            <summary className="cursor-pointer text-sm font-medium text-ink-gray-8">{_("Advanced fields")}</summary>
 
                         <div className="grid grid-cols-2 gap-3">
                             <Field label={_("Task Type")}>
@@ -319,14 +338,6 @@ export default function CreateTaskDialog({
                                     type="datetime-local"
                                     value={form.exp_start_date}
                                     onChange={(e) => set("exp_start_date", e.target.value)}
-                                />
-                            </Field>
-                            <Field label={_("Due")} htmlFor="task-due">
-                                <Input
-                                    id="task-due"
-                                    type="datetime-local"
-                                    value={form.exp_end_date}
-                                    onChange={(e) => set("exp_end_date", e.target.value)}
                                 />
                             </Field>
                             <Field label={_("Review Date")} htmlFor="task-review">
@@ -388,13 +399,14 @@ export default function CreateTaskDialog({
                         </div>
 
                         <Field label={_("Depends On")}>
+                            {(!!(loaded?.message.dependencies as { has_more?: boolean } | undefined)?.has_more || !!(loaded?.message.dependency_summary as { restricted?: boolean } | undefined)?.restricted) ? <p className="text-sm text-ink-gray-5">{_("Dependencies are paginated or restricted. Use Desk to edit the complete relationship list; existing links are preserved here.")}</p> :
                             <MultiLink
                                 doctype="Task"
                                 filters={projectFilter}
                                 values={form.depends_on}
                                 onChange={(v) => set("depends_on", v)}
                                 placeholder={_("Add dependency")}
-                            />
+                            />}
                         </Field>
 
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -441,16 +453,22 @@ export default function CreateTaskDialog({
                                 placeholder={_("Optional details (Shift+Enter for a new line)")}
                             />
                         </Field>
+                        <Field label={_("Acceptance criteria")} htmlFor="task-criteria">
+                            <Textarea id="task-criteria" maxLength={10000} rows={3} value={form.raven_acceptance_criteria} onChange={e => set("raven_acceptance_criteria", e.target.value)} />
+                        </Field>
+                        </details>
+                        </fieldset>
+                        {!task && <TaskFileQueue queue={queue} policy={uploadPolicy} disabled={busy} />}
+                        {createdTask && <p role="status" className="text-sm text-ink-green-4">{_("Task created. Upload failures do not recreate it.")} <a className="underline" href={taskPermalink(createdTask)}>{createdTask}</a></p>}
                     </DialogBody>
                     )}
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={loading}>
-                            {_("Cancel")}
+                        <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={busy}>
+                            {createdTask ? _("Done") : _("Cancel")}
                         </Button>
-                        <Button type="submit" loading={loading} disabled={!form.subject.trim() || !ready}>
-                            {task ? _("Save") : _("Add task")}
-                        </Button>
+                        {createdTask ? <Button type="button" loading={queue.busy} disabled={!queue.state.items.some(item => item.status === "selected")} onClick={() => void queue.uploadAll(createdTask)}>{_("Upload selected files")}</Button> :
+                            <Button type="submit" loading={busy} disabled={!form.subject.trim() || !ready}>{task ? _("Save") : _("Add task")}</Button>}
                     </DialogFooter>
                 </form>
             </DialogContent>

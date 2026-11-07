@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from frappe.custom.doctype.property_setter.property_setter import make_property_setter
 
 
 def add_task_customer_facing_field() -> None:
@@ -19,6 +20,27 @@ def add_task_customer_facing_field() -> None:
 		},
 		ignore_validate=True,
 	)
+
+
+def add_task_context_fields() -> None:
+	"""Add optional Raven task context without changing existing task data."""
+	fields = [
+		{"fieldname": "raven_blocker_kind", "label": "Blocker", "fieldtype": "Select",
+		 "options": "\nWaiting on customer\nWaiting on dependency\nNeeds decision\nAccess issue", "insert_after": "raven_customer_facing"},
+		{"fieldname": "raven_blocker_reason", "label": "Blocker reason", "fieldtype": "Small Text", "insert_after": "raven_blocker_kind"},
+		{"fieldname": "raven_blocker_owner", "label": "Blocker responsible person", "fieldtype": "Link", "options": "User", "insert_after": "raven_blocker_reason"},
+		{"fieldname": "raven_acceptance_criteria", "label": "Acceptance criteria", "fieldtype": "Text", "insert_after": "description"},
+		{"fieldname": "raven_review_handoff", "label": "Review handoff", "fieldtype": "Code", "options": "JSON", "read_only": 1, "insert_after": "raven_acceptance_criteria"},
+	]
+	create_custom_fields({"Task": fields}, ignore_validate=True)
+	name = frappe.db.get_value("Property Setter", {"doc_type": "Task", "doctype_or_field": "DocType", "property": "track_changes"})
+	if not name:
+		make_property_setter("Task", None, "track_changes", "1", "Check", for_doctype=True)
+	elif frappe.db.get_value("Property Setter", name, "value") != "1":
+		doc = frappe.get_doc("Property Setter", name)
+		doc.value = "1"
+		doc.save()
+	frappe.clear_cache(doctype="Task")
 
 
 def setup_project_hub(settings) -> None:
@@ -48,6 +70,7 @@ def setup_project_hub(settings) -> None:
 	)
 
 	add_task_customer_facing_field()
+	add_task_context_fields()
 	_ensure_project_bot(settings)
 	_ensure_create_task_action()
 	_ensure_implementation_project_type()

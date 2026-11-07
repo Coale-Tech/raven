@@ -113,12 +113,12 @@ export default function ProjectHub() {
     // The URL is the source of truth for the shared/bookmarked link — a missing
     // or invalid `tab` param is normalized into the URL once, on landing.
     useEffect(() => {
-        if (urlTab !== tab) setSearchParams({ tab, ...(channelID ? { channel: channelID } : {}) }, { replace: true })
+        if (urlTab !== tab) setSearchParams(previous => { const next = new URLSearchParams(previous); next.set("tab", tab); return next }, { replace: true })
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const onTabChange = (next: string) => {
-        setSearchParams({ tab: next, ...(channelID ? { channel: channelID } : {}) }, { replace: true })
+        setSearchParams(previous => { const params = new URLSearchParams(previous); params.set("tab", next); if (next !== "tasks") params.delete("task"); return params }, { replace: true })
         localStorage.setItem(LAST_TAB_KEY, next)
     }
 
