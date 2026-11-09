@@ -5,6 +5,7 @@ export type TaskCardData = {
     name: string; project: string; subject: string; status: string; priority: string
     exp_end_date: string | null; creation: string; modified: string; progress: number
     is_template: number; is_group: number; raven_customer_facing: number
+    auto_repeat: string | null; repeat: { name: string; frequency: string; status: string } | null
     parent_task: string | null; parent: { name?: string; subject?: string; restricted?: boolean } | null
     assignees: TaskPerson[]; child_counts: { completed: number; total: number; cancelled: number }
     discussion_count: number; latest_update: { summary: string; actor: string; creation: string } | null
