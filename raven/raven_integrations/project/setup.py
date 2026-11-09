@@ -43,6 +43,21 @@ def add_task_context_fields() -> None:
 	frappe.clear_cache(doctype="Task")
 
 
+def enable_task_auto_repeat() -> None:
+	"""Let Frappe Auto Repeat copy a Task on a schedule (what Customize Form does when "Allow Auto Repeat" is ticked). Idempotent."""
+	make_property_setter("Task", None, "allow_auto_repeat", "1", "Check", for_doctype=True)
+	create_custom_fields(
+		{
+			"Task": [
+				{"fieldname": "auto_repeat", "label": "Auto Repeat", "fieldtype": "Link", "options": "Auto Repeat",
+				 "insert_after": "raven_review_handoff", "read_only": 1, "no_copy": 1, "print_hide": 1}
+			]
+		},
+		ignore_validate=True,
+	)
+	frappe.clear_cache(doctype="Task")
+
+
 def setup_project_hub(settings) -> None:
 	"""Idempotent one-time setup run when Project Hub is turned on."""
 	create_custom_fields(

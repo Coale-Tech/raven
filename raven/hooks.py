@@ -106,6 +106,7 @@ after_migrate = [
 	"raven.install.add_customer_statement_to_selling_sidebar",
 	"raven.raven_integrations.project.setup.add_task_customer_facing_field",
 	"raven.raven_integrations.project.setup.add_task_context_fields",
+	"raven.raven_integrations.project.setup.enable_task_auto_repeat",
 ]
 # after_sync = ""
 
@@ -178,6 +179,7 @@ doc_events = {
 		"after_insert": "raven.raven_integrations.controllers.task.after_insert",
 		"validate": "raven.raven_integrations.project.tasks.validate_task_context",
 		"on_update": "raven.raven_integrations.controllers.task.on_update",
+		"on_recurring": "raven.raven_integrations.controllers.task.on_recurring",
 	},
 	"Issue": {
 		"after_insert": "raven.raven_integrations.controllers.issue.after_insert",
