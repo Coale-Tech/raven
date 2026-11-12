@@ -6,7 +6,7 @@ from frappe.utils.html_utils import clean_html
 from raven.raven_integrations.project.github import fetch_changelog
 from raven.raven_integrations.project.drive import folder_for_project
 
-from raven.raven_integrations.project import task_activity, task_board, tasks as task_service
+from raven.raven_integrations.project import task_activity, task_board, task_time, tasks as task_service
 TASK_CREATE_FIELDS = (
 	"status",
 	"priority",
@@ -127,6 +127,21 @@ def set_task_assignees(task: str, users: list[str], expected_modified: str) -> d
 def task_action(task: str, action: str, expected_modified: str, payload: dict | None = None) -> dict:
 	doc = task_service.perform_action(task, action, expected_modified, payload)
 	return get_task(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def log_task_time(task: str, started_at: str, hours: float, activity_type: str | None = None, description: str | None = None) -> None:
+	task_time.log_time(task, started_at, hours, activity_type, description)
+
+
+@frappe.whitelist(methods=["POST"])
+def start_task_timer(task: str) -> None:
+	task_time.start_timer(task)
+
+
+@frappe.whitelist(methods=["POST"])
+def stop_task_timer(task: str, discard: bool = False, activity_type: str | None = None, description: str | None = None) -> None:
+	task_time.stop_timer(task, discard, activity_type, description)
 
 
 @frappe.whitelist(methods=["POST"])

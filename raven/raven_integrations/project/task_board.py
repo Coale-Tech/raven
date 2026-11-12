@@ -8,9 +8,10 @@ from frappe.utils import cint, get_system_timezone, now_datetime, strip_html
 from pypika import Case, Order
 from pypika.terms import Function
 
+from raven.raven_integrations.project.task_time import card_time
 from raven.raven_integrations.project.tasks import STATUSES, TERMINAL, action_names
 
-FIELDS = ["name", "subject", "status", "priority", "exp_end_date", "creation", "modified", "progress", "parent_task", "is_group", "is_template", "raven_customer_facing", "raven_blocker_kind", "raven_blocker_reason", "raven_blocker_owner", "owner", "auto_repeat"]
+FIELDS = ["name", "subject", "status", "priority", "exp_end_date", "creation", "modified", "progress", "parent_task", "is_group", "is_template", "raven_customer_facing", "raven_blocker_kind", "raven_blocker_reason", "raven_blocker_owner", "owner", "auto_repeat", "type", "expected_time"]
 
 
 def paging(start, page_length):
@@ -64,6 +65,7 @@ def cards_for_tasks(rows: list) -> list[dict]:
 		if frappe.has_permission("Comment", "read", doc=frappe.get_doc({"doctype": "Comment", **comment})):
 			comments[comment.reference_name].append(comment)
 	repeats = {row.name: row for row in frappe.get_all("Auto Repeat", filters={"name": ["in", [row.get("auto_repeat") for row in rows if row.get("auto_repeat")] or [""]]}, fields=["name", "frequency", "status"])}
+	times = card_time(rows)
 	out = []
 	for row in rows:
 		doc = frappe.get_doc({"doctype": "Task", "project": project, **row})
@@ -75,7 +77,7 @@ def cards_for_tasks(rows: list) -> list[dict]:
 		parent = parent_map.get(doc.get("parent_task"))
 		safe_row = {key: doc.get(key) for key in row}
 		safe_row["parent_task"] = parent.name if parent else None
-		out.append({**safe_row, "repeat": repeats.get(doc.get("auto_repeat")), "parent": parent or ({"restricted": True} if doc.get("parent_task") else None),
+		out.append({**safe_row, "time": times.get(row.name), "repeat": repeats.get(doc.get("auto_repeat")), "parent": parent or ({"restricted": True} if doc.get("parent_task") else None),
 			"assignees": [people[user] for user in dict.fromkeys(assigned[row.name]) if user in people],
 			"child_counts": children[row.name], "discussion_count": len(comments[row.name]),
 			"latest_update": {"summary": strip_html(latest.content)[:180], "actor": latest.owner, "creation": latest.creation} if latest else None,

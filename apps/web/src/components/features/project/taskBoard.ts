@@ -13,6 +13,7 @@ export type TaskCardData = {
     dependency_summary: { unresolved: number; restricted: boolean; ready: boolean }
     permissions: { read: boolean; write: boolean; comment: boolean; upload: boolean; create_subtask: boolean }
     allowed_actions: string[]
+    type: string | null; expected_time: number; time: { logged: number; running: boolean } | null
 }
 export type TaskLane = { key: string; label: string; total: number; items: TaskCardData[]; has_more: boolean; next_start: number | null }
 export type TaskPage = {
@@ -26,6 +27,16 @@ export type TaskDetail = TaskCardData & {
     description: string; description_html: string; raven_acceptance_criteria: string; assignee_users: string[]
     children: Collection<TaskCardData>; dependencies: Collection<TaskCardData>; upload_policy: TaskUploadPolicy
     suggestions_available: boolean; handoff: { summary: string; checks: string; reviewer: string; requested_by: string; requested_on: string; evidence: TaskFile[] } | null
+    time_log: TaskTimeLog | null
+}
+export type TaskTimeEntry = { name: string; parent: string; owner: string; from_time: string; hours: number; activity_type: string | null; description: string | null }
+export type TaskTimeLog = { entries: TaskTimeEntry[]; timer: { task: string; started_at: string; subject: string } | null; server_now: string; can_log: boolean; activity_types: string[] }
+export function formatHours(hours: number): string {
+    return `${Math.round(hours * 100) / 100}h`
+}
+export function formatElapsed(ms: number): string {
+    const total = Math.max(0, Math.floor(ms / 1000))
+    return [Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60].map(part => String(part).padStart(2, "0")).join(":")
 }
 export type TaskUpdate = { name: string; content: string; actor: string; creation: string; kind: string; changes?: { field: string; before: string; after: string }[] }
 export type SuggestedTask = { key: string; title: string; owner: string | null; depends_on: string[]; acceptance_criteria: string }

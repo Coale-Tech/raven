@@ -11,6 +11,7 @@ from frappe.utils.html_utils import clean_html
 from pypika.terms import Function
 
 from raven.raven_integrations.project.task_board import FIELDS, cards_for_tasks, paging, read_query
+from raven.raven_integrations.project.task_time import detail as time_detail
 from raven.raven_integrations.project.tasks import assignments, eligible_user, require_task, text
 
 
@@ -100,6 +101,7 @@ def detail(task: str, editor_fields: tuple) -> dict:
 		handoff["evidence"] = [files[name] for name in handoff.get("evidence", []) if name in files]
 	out["handoff"] = handoff
 	out["upload_policy"] = upload_policy(task)
+	out["time_log"] = time_detail(doc)
 	out["suggestions_available"] = bool(out["permissions"]["create_subtask"] and frappe.db.get_single_value("Raven Settings", "enable_ai_integration"))
 	return out
 

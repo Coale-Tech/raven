@@ -12,6 +12,7 @@ import CreateTaskDialog from "./tabs/CreateTaskDialog"
 import TaskActions, { TaskAssignmentDialog, type TaskMutation } from "./TaskActions"
 import TaskFileQueue, { useTaskFileQueue } from "./TaskFileQueue"
 import TaskSubtasks from "./TaskSubtasks"
+import TaskTime from "./TaskTime"
 import { taskPermalink, type Collection, type TaskCardData, type TaskDetail, type TaskFile, type TaskUpdate } from "./taskBoard"
 import _ from "@lib/translate"
 
@@ -39,7 +40,7 @@ function PanelBody({ task, busy, errorMessage, onOpen, onChanged, onAction, onSe
             <TaskActions task={task} busy={busy} onAction={onAction} onSend={onSend} onAssign={() => setAssign(true)} />
         </div>
         {errorMessage && <p role="alert" className="px-4 py-2 text-sm text-ink-red-4">{errorMessage}</p>}
-        <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col"><TabsList variant="underline" className="shrink-0 px-4">{["Details", "Discussion", "Activity", "Files"].map(tab => <TabsTrigger key={tab} value={tab.toLowerCase()}>{_(tab)}</TabsTrigger>)}</TabsList>
+        <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col"><TabsList variant="underline" className="shrink-0 px-4">{["Details", "Discussion", "Activity", "Files", ...(task.time_log ? ["Time"] : [])].map(tab => <TabsTrigger key={tab} value={tab.toLowerCase()}>{_(tab)}</TabsTrigger>)}</TabsList>
             <TabsContent value="details" className="min-h-0 flex-1 overflow-y-auto p-4"><div className="flex flex-col gap-4 text-sm">
                 <div><h3 className="font-medium">{_("Owner")}</h3><Button variant="ghost" size="sm" className="px-0" disabled={!task.permissions.write || busy} onClick={() => setAssign(true)}>{task.assignees.map(person => person.full_name || person.name).join(", ") || _("Unassigned")}</Button></div>
                 {task.exp_end_date && <p>{_("Due (site time)")}: {task.exp_end_date.slice(0, 16)}</p>}
@@ -57,6 +58,7 @@ function PanelBody({ task, busy, errorMessage, onOpen, onChanged, onAction, onSe
             <TabsContent value="discussion" className="min-h-0 flex-1 overflow-y-auto p-4"><TaskTimeline task={task} kind="discussion" onChanged={onChanged} /></TabsContent>
             <TabsContent value="activity" className="min-h-0 flex-1 overflow-y-auto p-4"><TaskTimeline task={task} kind="activity" onChanged={onChanged} /></TabsContent>
             <TabsContent value="files" className="min-h-0 flex-1 overflow-y-auto p-4"><TaskFiles task={task} onChanged={onChanged} /></TabsContent>
+            {task.time_log && <TabsContent value="time" className="min-h-0 flex-1 overflow-y-auto p-4"><TaskTime task={task} log={task.time_log} onChanged={onChanged} /></TabsContent>}
         </Tabs>
         {edit && <CreateTaskDialog project={task.project} task={task.name} uploadPolicy={task.upload_policy} open onOpenChange={setEdit} onSaved={onChanged} />}
         {assign && <TaskAssignmentDialog task={task} busy={busy} onAction={onAction} onClose={() => setAssign(false)} />}

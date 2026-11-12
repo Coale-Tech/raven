@@ -107,6 +107,7 @@ after_migrate = [
 	"raven.raven_integrations.project.setup.add_task_customer_facing_field",
 	"raven.raven_integrations.project.setup.add_task_context_fields",
 	"raven.raven_integrations.project.setup.enable_task_auto_repeat",
+	"raven.raven_integrations.project.setup.add_dev_task_type",
 ]
 # after_sync = ""
 

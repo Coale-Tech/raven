@@ -3,7 +3,7 @@ import { Button } from "@components/ui/button"
 import { Spinner } from "@components/ui/spinner"
 import { cn } from "@lib/utils"
 import TaskActions, { type TaskMutation } from "./TaskActions"
-import { siteTimestamp, taskDue, type TaskCardData } from "./taskBoard"
+import { formatHours, siteTimestamp, taskDue, type TaskCardData } from "./taskBoard"
 import _ from "@lib/translate"
 
 export default function TaskCard({ task, serverNow, busy, error, onOpen, onAction, onAssign, onSend }: {
@@ -23,6 +23,7 @@ export default function TaskCard({ task, serverNow, busy, error, onOpen, onActio
             <div className="flex items-start gap-1"><button type="button" onClick={() => onOpen(task.name)} className="min-w-0 flex-1 break-words text-left text-sm font-medium text-ink-gray-9 hover:underline">{task.subject}</button><TaskActions task={task} busy={busy} onAction={onAction} onAssign={onAssign} onSend={onSend} /></div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-ink-gray-5"><span>{task.name}</span><span>{_("{0}d old", [String(Number.isFinite(age) ? age : 0)])}</span><span className={ageClass}>{_("{0}d old", [String(Number.isFinite(age) ? age : 0)])}</span>{task.priority !== "Medium" && <span className={priorityClass}>{priorityText}</span>}</div>
             {task.repeat && <div><Badge variant="subtle" theme={task.repeat.status === "Active" ? "blue" : "gray"} size="sm" title={task.repeat.name}>{_("Repeats {0}", [_(task.repeat.frequency)])}{task.repeat.status !== "Active" && ` · ${_(task.repeat.status)}`}</Badge></div>}
+            {task.time && <div><Badge variant="subtle" theme={task.time.running ? "green" : task.expected_time > 0 && task.time.logged > task.expected_time ? "red" : "gray"} size="sm" title={_("Time logged")}>{task.time.running && "● "}{formatHours(task.time.logged)}{task.expected_time > 0 && ` / ${formatHours(task.expected_time)}`}</Badge></div>}
             {(task.exp_end_date || due === "overdue") && (
                 <p className={cn("text-xs", due === "overdue" ? "text-ink-red-4" : due === "soon" ? "text-ink-amber-4" : "text-ink-gray-6")}>
                     {dueText}{task.exp_end_date ? ` · ${task.exp_end_date.slice(0, 16)}` : ""}{priorityText}

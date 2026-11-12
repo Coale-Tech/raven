@@ -4,6 +4,12 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.custom.doctype.property_setter.property_setter import make_property_setter
 
 
+def add_dev_task_type() -> None:
+	"""Task Type that switches on time tracking in the Project Hub. Idempotent; also runs on every migrate."""
+	if not frappe.db.exists("Task Type", "Development"):
+		frappe.get_doc({"doctype": "Task Type", "__newname": "Development"}).insert(ignore_permissions=True)
+
+
 def add_task_customer_facing_field() -> None:
 	"""The marker that enables "Send to customer" on a Task. Idempotent; also runs on every migrate."""
 	create_custom_fields(
