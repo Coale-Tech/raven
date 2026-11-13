@@ -1,7 +1,7 @@
+import unittest
 from unittest.mock import patch
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, getdate, today
 
 from raven.api.suggestions import approve, dismiss, get_suggestions
@@ -10,7 +10,7 @@ from raven.raven_integrations.project.suggestions import extract, on_raven_messa
 LLM = "raven.raven_integrations.project.suggestions._ask_llm"
 
 
-class TestSuggestions(IntegrationTestCase):
+class TestSuggestions(unittest.TestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		self.addCleanup(frappe.db.rollback)  # each test builds its own customer/projects
@@ -124,9 +124,16 @@ class TestSuggestions(IntegrationTestCase):
 		frappe.cache.delete(key)
 		self.addCleanup(frappe.cache.delete, key)
 
+		# a message that was read is not read again, so each call needs a message of its own
+		names = [self.message.name] + [
+			frappe.get_doc(
+				{"doctype": "WhatsApp Message", "type": "Incoming", "from": "254700111222", "message": f"Please fix problem number {i} today"}
+			).insert(ignore_permissions=True).name
+			for i in range(3)
+		]
 		with patch(LLM, return_value={"suggestions": []}) as llm:
-			for _ in range(4):
-				extract("WhatsApp Message", self.message.name)
+			for name in names:
+				extract("WhatsApp Message", name)
 		self.assertEqual(llm.call_count, 2)
 
 	def test_channel_messages_are_read_only_when_opted_in(self):

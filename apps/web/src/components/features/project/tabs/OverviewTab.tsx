@@ -2,6 +2,7 @@ import { useFrappeGetCall } from "frappe-react-sdk"
 import ErrorBanner from "@components/ui/error-banner"
 import { Spinner } from "@components/ui/spinner"
 import { ServerHtml } from "@components/features/message/renderers/DocumentLinkRenderer"
+import ProjectHealth from "@components/features/project/ProjectHealth"
 import { formatDate } from "@lib/date"
 import _ from "@lib/translate"
 
@@ -69,6 +70,7 @@ export default function OverviewTab({ project }: { project: string }) {
 
     return (
         <div className="flex flex-col gap-6">
+            <ProjectHealth project={project} />
             <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <DetailRow label={_("Project Type")} value={overview.project_type} />
                 <DetailRow label={_("Priority")} value={overview.priority} />

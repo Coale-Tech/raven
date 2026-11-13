@@ -24,6 +24,7 @@ MIN_CHARS = 15  # "ok thanks" is not work
 MAX_CHARS = 2000
 MAX_PER_MESSAGE = 5
 DEFAULT_DAILY_LIMIT = 200
+SEEN_DAYS = 30  # how long a read message with no findings is remembered, so rescans skip it
 CLOSED = ["Completed", "Cancelled", "Template"]
 
 PROMPT = """You read ONE inbound message about a project and extract work a project manager must track.
@@ -68,15 +69,42 @@ def on_raven_message(doc, method=None):
 		_queue(doc)
 
 
+def phone_tail(number: str | None) -> str:
+	"""Last 9 digits: matches +254 700 111222 against 0700111222; shorter strings never match."""
+	tail = "".join(c for c in number or "" if c.isdigit())[-9:]
+	return tail if len(tail) == 9 else ""
+
+
+def _seen_key(doctype: str, name: str) -> str:
+	return f"raven_suggestion_read:{doctype}:{name}"
+
+
+def was_read(doctype: str, name: str) -> bool:
+	return bool(frappe.cache.get_value(_seen_key(doctype, name)))
+
+
+def _mark_read(doctype: str, name: str) -> None:
+	# shortcut: marker lives in Redis for SEEN_DAYS, so a cache flush lets a rescan re-read at most one
+	# scan window of messages (bounded by SCAN_LIMIT and the daily limit); upgrade to a column if that bites.
+	frappe.cache.set_value(_seen_key(doctype, name), 1, expires_in_sec=SEEN_DAYS * 86400)
+
+
 def _customers(doc) -> list[str]:
+	if doc.get("reference_doctype") == "Customer" and doc.get("reference_name"):
+		return [doc.reference_name]
+
 	if doc.doctype == "WhatsApp Message":
-		tail = "".join(c for c in doc.get("from") or "" if c.isdigit())[-9:]
-		if len(tail) < 9:
+		tail = phone_tail(doc.get("from"))
+		if not tail:
 			return []
+		digits = "right(regexp_replace(ifnull({}, ''), '[^0-9]', ''), 9) = %s"
 		return frappe.db.sql_list(
-			"select name from tabCustomer where disabled = 0"
-			" and right(regexp_replace(ifnull(mobile_no, ''), '[^0-9]', ''), 9) = %s",
-			tail,
+			f"""select name from tabCustomer where disabled = 0 and {digits.format("mobile_no")}
+			union select dl.link_name from `tabContact Phone` cp
+			join `tabDynamic Link` dl on dl.parent = cp.parent and dl.parenttype = 'Contact' and dl.link_doctype = 'Customer'
+			join tabCustomer c on c.name = dl.link_name and c.disabled = 0
+			where {digits.format("cp.phone")}""",
+			(tail, tail),
 		)
 
 	email = parse_addr(doc.sender or "")[1]
@@ -160,7 +188,9 @@ def _ask_llm(bot, payload: dict) -> dict:
 
 def extract(doctype: str, name: str) -> None:
 	"""Background job: ask the LLM what, if anything, needs tracking and file Pending suggestions."""
-	if not _enabled() or frappe.db.exists("Raven Suggestion", {"source_doctype": doctype, "source_name": name}):
+	if not _enabled() or was_read(doctype, name):
+		return
+	if frappe.db.exists("Raven Suggestion", {"source_doctype": doctype, "source_name": name}):
 		return
 
 	doc = frappe.get_doc(doctype, name)
@@ -179,6 +209,7 @@ def extract(doctype: str, name: str) -> None:
 	except Exception:
 		frappe.log_error(title=f"Raven suggestion extraction failed: {doctype} {name}")
 		return
+	_mark_read(doctype, name)
 
 	users = {c["id"]: set(c["users"]) for c in context}
 	created: dict[str, list[str]] = {}

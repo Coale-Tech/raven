@@ -48,12 +48,18 @@ def create_project(
 	customer: str | None = None,
 	expected_end_date: str | None = None,
 	project_type: str | None = None,
+	project_template: str | None = None,
 ) -> str:
 	"""Projects list → "New Project" dialog. `frappe.new_doc` fills every other
 	Project default (status, naming_series, ...) the same way Desk's New button
 	does; the after_insert hook creates the project's channel synchronously.
 	"""
 	frappe.has_permission("Project", "create", throw=True)
+	if project_template:
+		frappe.has_permission("Project Template", "read", project_template, throw=True)
+		if frappe.db.get_value("Project Template", project_template, "disabled"):
+			frappe.throw(_("Project Template {0} is disabled").format(project_template))
+	# ERPNext's Project.after_insert copies the template's tasks (Project.copy_from_template).
 	doc = frappe.new_doc(
 		"Project",
 		project_name=project_name,
@@ -61,6 +67,7 @@ def create_project(
 		customer=customer or None,
 		expected_end_date=expected_end_date or None,
 		project_type=project_type or None,
+		project_template=project_template or None,
 	)
 	doc.insert()
 	return doc.name

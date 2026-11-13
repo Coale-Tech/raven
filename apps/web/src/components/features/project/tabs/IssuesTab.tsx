@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { useFrappeGetCall } from "frappe-react-sdk"
+import { useSearchParams } from "react-router-dom"
 import type { ColumnDef } from "@tanstack/react-table"
 import { CircleAlertIcon, PlusIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
@@ -19,6 +20,7 @@ type ProjectIssue = {
     priority: string
     opening_date: string | null
     raised_by: string | null
+    tasks: { name: string; subject: string }[]
 }
 
 const STATUS_THEME: Record<string, "gray" | "blue" | "green" | "amber" | "red"> = {
@@ -44,6 +46,7 @@ export default function IssuesTab({ project }: { project: string }) {
         ["project_issue_options", project],
     )
     const [creating, setCreating] = useState(false)
+    const [, setParams] = useSearchParams()
 
     const columns = useMemo<ColumnDef<ProjectIssue>[]>(
         () => [
@@ -82,6 +85,26 @@ export default function IssuesTab({ project }: { project: string }) {
                 cell: ({ row }) => <Badge variant="subtle">{_(row.original.priority)}</Badge>,
             },
             {
+                id: "tasks",
+                header: _("Task"),
+                meta: { gridWidth: "minmax(0,1fr)" } satisfies ListViewColumnMeta,
+                cell: ({ row }) => (
+                    <div className="flex min-w-0 flex-wrap gap-1">
+                        {row.original.tasks.map((task) => (
+                            <button
+                                key={task.name}
+                                type="button"
+                                title={task.subject}
+                                onClick={() => setParams((previous) => { const next = new URLSearchParams(previous); next.set("tab", "tasks"); next.set("task", task.name); return next })}
+                                className="max-w-full truncate"
+                            >
+                                <Badge variant="subtle">{task.subject}</Badge>
+                            </button>
+                        ))}
+                    </div>
+                ),
+            },
+            {
                 id: "opening_date",
                 accessorKey: "opening_date",
                 header: _("Opened"),
@@ -93,7 +116,7 @@ export default function IssuesTab({ project }: { project: string }) {
                 ),
             },
         ],
-        [],
+        [setParams],
     )
 
     if (!data && !error) {

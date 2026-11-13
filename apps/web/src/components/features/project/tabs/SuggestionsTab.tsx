@@ -1,9 +1,11 @@
 import { useState } from "react"
 import { useFrappeGetCall, useFrappePostCall, useSWRConfig, type FrappeError } from "frappe-react-sdk"
-import { CheckIcon, InboxIcon, PencilIcon, XIcon } from "lucide-react"
+import { CheckIcon, HashIcon, InboxIcon, MailIcon, MessageCircleIcon, PencilIcon, RefreshCwIcon, XIcon } from "lucide-react"
+import { toast } from "sonner"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@components/ui/empty"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@components/ui/dropdown-menu"
 import ErrorBanner, { errorResponseToast } from "@components/ui/error-banner"
 import { Input } from "@components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select"
@@ -15,6 +17,7 @@ import _ from "@lib/translate"
 
 type Kind = "Task" | "Issue" | "Decision"
 type Status = "Pending" | "Approved" | "Rejected" | "FYI"
+type Source = "channel" | "email" | "whatsapp"
 
 type Suggestion = {
     name: string
@@ -25,6 +28,7 @@ type Suggestion = {
     due_date: string | null
     status: Status
     source_doctype: string
+    source: Source | null
     source_excerpt: string | null
     source_link: string | null
     result_doctype: string | null
@@ -36,6 +40,12 @@ type Draft = Pick<Suggestion, "kind" | "title" | "description" | "assignee" | "d
 
 const KIND_THEME: Record<Kind, "blue" | "amber" | "green"> = { Task: "blue", Issue: "amber", Decision: "green" }
 const STATUSES: Status[] = ["Pending", "Approved", "Rejected", "FYI"]
+const SOURCES: Record<Source, { label: string; icon: typeof HashIcon }> = {
+    channel: { label: "Channel", icon: HashIcon },
+    email: { label: "Email", icon: MailIcon },
+    whatsapp: { label: "WhatsApp", icon: MessageCircleIcon },
+}
+type ScanResult = { message: { source: Source; found: number; queued: number; skipped: "unavailable" | "no_permission" | null } }
 
 /** Project Hub → Inbox: what the AI found in customer/team messages. Nothing is tracked until a person approves it. */
 export default function SuggestionsTab({ project }: { project: string }) {
@@ -46,6 +56,7 @@ export default function SuggestionsTab({ project }: { project: string }) {
         ["project_suggestions", project, status],
     )
     const { mutate: globalMutate } = useSWRConfig()
+    const { call: scan, loading: scanning } = useFrappePostCall<ScanResult>("raven.api.suggestions.scan")
     const rows = data?.message ?? []
 
     // An approval creates a Task/Issue/Note elsewhere in the Hub.
@@ -54,22 +65,59 @@ export default function SuggestionsTab({ project }: { project: string }) {
         globalMutate(key => Array.isArray(key) && key[1] === project && ["project_tasks", "project_issues", "project_notes", "project_overview"].includes(String(key[0])))
     }
 
+    const onScan = (source: Source) =>
+        scan({ project, source })
+            .then(({ message: res }) => {
+                const label = _(SOURCES[source].label)
+                if (res.skipped === "unavailable") toast.info(_("{0} is not available on this site", [label]))
+                else if (res.skipped === "no_permission") toast.info(_("You do not have permission to read {0} messages", [label]))
+                else if (res.queued === 0) toast.info(_("No new {0} messages to read", [label]))
+                else {
+                    toast.success(_("Reading {0} {1} message(s); suggestions will appear shortly", [String(res.queued), label]))
+                    // The AI reads run in the background; check back instead of leaving the list stale.
+                    setTimeout(refresh, 8000)
+                    setTimeout(refresh, 25000)
+                }
+            })
+            .catch((e: FrappeError) => errorResponseToast(_("Could not scan"), e))
+
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
                 <p className="text-sm text-ink-gray-6">{_("Review what was found in messages before it becomes work.")}</p>
-                <Select value={status} onValueChange={(v) => setStatus(v as Status)}>
-                    <SelectTrigger inputSize="sm" className="h-7 w-32">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {STATUSES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                                {_(s)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" loading={scanning}>
+                                <RefreshCwIcon />
+                                {_("Scan now")}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            {(Object.keys(SOURCES) as Source[]).map((s) => {
+                                const Icon = SOURCES[s].icon
+                                return (
+                                    <DropdownMenuItem key={s} onSelect={() => void onScan(s)}>
+                                        <Icon />
+                                        {_(SOURCES[s].label)}
+                                    </DropdownMenuItem>
+                                )
+                            })}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Select value={status} onValueChange={(v) => setStatus(v as Status)}>
+                        <SelectTrigger inputSize="sm" className="h-7 w-32">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {STATUSES.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                    {_(s)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {error ? (
@@ -102,6 +150,7 @@ function SuggestionCard({ row, onDone }: { row: Suggestion; onDone: () => void }
     const { call: approve, loading: approving } = useFrappePostCall("raven.api.suggestions.approve")
     const { call: dismiss, loading: dismissing } = useFrappePostCall("raven.api.suggestions.dismiss")
     const pending = row.status === "Pending"
+    const SourceIcon = row.source ? SOURCES[row.source].icon : null
     const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => d && { ...d, [key]: value })
 
     const onApprove = () =>
@@ -181,7 +230,16 @@ function SuggestionCard({ row, onDone }: { row: Suggestion; onDone: () => void }
                 <blockquote className="border-l-2 border-outline-gray-3 pl-3 text-sm text-ink-gray-6">
                     <span className="line-clamp-3">{row.source_excerpt}</span>
                     <span className="mt-1 flex gap-2 text-xs">
-                        {_(row.source_doctype)} · {formatRelativeDate(row.creation)}
+                        {row.source && SourceIcon ? (
+                            <Badge variant="outline" theme="gray">
+                                <SourceIcon />
+                                {_(SOURCES[row.source].label)}
+                            </Badge>
+                        ) : (
+                            _(row.source_doctype)
+                        )}
+                        {" · "}
+                        {formatRelativeDate(row.creation)}
                         {row.source_link && (
                             <a href={row.source_link} target="_blank" rel="noreferrer" className="underline">
                                 {_("Open source")}

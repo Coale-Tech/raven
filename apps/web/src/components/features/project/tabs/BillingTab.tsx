@@ -1,5 +1,6 @@
+import { useState } from "react"
 import { useFrappeGetCall } from "frappe-react-sdk"
-import { FileTextIcon, PlusIcon } from "lucide-react"
+import { ClockIcon, FileTextIcon, PlusIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
 import ErrorBanner from "@components/ui/error-banner"
@@ -7,6 +8,7 @@ import { Spinner } from "@components/ui/spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@components/ui/table"
 import { formatDate } from "@lib/date"
 import _ from "@lib/translate"
+import BillTimeDialog from "./BillTimeDialog"
 
 type BillingTotals = {
     total_sales_amount: number | null
@@ -56,6 +58,7 @@ const newDocUrl = (doctype: string, project: string, customer: string | null) =>
 
 /** Project Hub → Billing: totals strip plus Invoices/Orders tables (a `null` table means no read permission). */
 export default function BillingTab({ project }: { project: string }) {
+    const [billTime, setBillTime] = useState(false)
     const { data, error } = useFrappeGetCall<{ message: Billing }>(
         "raven.api.project_tabs.get_billing",
         { project },
@@ -87,6 +90,7 @@ export default function BillingTab({ project }: { project: string }) {
 
     return (
         <div className="flex flex-col gap-6">
+            <BillTimeDialog project={project} open={billTime} onOpenChange={setBillTime} />
             {can_view_statement && customer && (
                 <div className="flex justify-end">
                     <Button
@@ -118,14 +122,20 @@ export default function BillingTab({ project }: { project: string }) {
                     <div className="flex items-center justify-between">
                         <h3 className="text-sm-medium text-ink-gray-7">{_("Sales Invoices")}</h3>
                         {can_create_invoice && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(newDocUrl("sales-invoice", project, customer), "_blank")}
-                            >
-                                <PlusIcon />
-                                {_("New Invoice")}
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setBillTime(true)}>
+                                    <ClockIcon />
+                                    {_("Bill logged time")}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(newDocUrl("sales-invoice", project, customer), "_blank")}
+                                >
+                                    <PlusIcon />
+                                    {_("New Invoice")}
+                                </Button>
+                            </div>
                         )}
                     </div>
                     {invoices.length === 0 ? (

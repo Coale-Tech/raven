@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import escape_html
 
 from raven.api.project_tabs import add_note, create_issue, create_task
+from raven.raven_integrations.project import inbox_sources
 from raven.raven_integrations.project.suggestions import KINDS
 
 EDITABLE = ("kind", "title", "description", "assignee", "due_date")
@@ -46,7 +47,15 @@ def get_suggestions(project: str, status: str = "Pending") -> list[dict]:
 	)
 	for row in rows:
 		row["source_link"] = _source_link(row)
+		row["source"] = inbox_sources.SOURCE_BY_DOCTYPE.get(row.source_doctype)
 	return rows
+
+
+@frappe.whitelist(methods=["POST"])
+def scan(project: str, source: str) -> dict:
+	"""Read the project's recent messages from one source (channel | email | whatsapp) for suggestions."""
+	frappe.has_permission("Project", "write", project, throw=True)
+	return inbox_sources.scan(project, source)
 
 
 def _pending(name: str):

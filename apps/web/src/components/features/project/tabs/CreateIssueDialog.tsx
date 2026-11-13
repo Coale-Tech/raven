@@ -33,6 +33,7 @@ type Form = {
     email_account: string
     service_level_agreement: string
     description: string
+    task: string
 }
 
 /**
@@ -43,6 +44,7 @@ export default function CreateIssueDialog({
     project,
     priorities,
     issueTypes,
+    defaultTask,
     open,
     onOpenChange,
     onCreated,
@@ -50,6 +52,8 @@ export default function CreateIssueDialog({
     project: string
     priorities: string[]
     issueTypes: string[]
+    /** Task the issue is opened from; pre-selects the Task field. */
+    defaultTask?: string
     open: boolean
     onOpenChange: (open: boolean) => void
     onCreated: () => void
@@ -70,6 +74,7 @@ export default function CreateIssueDialog({
         email_account: "",
         service_level_agreement: "",
         description: "",
+        task: defaultTask ?? "",
     }
     const [form, setForm] = useState<Form>(initial)
     const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }))
@@ -85,7 +90,7 @@ export default function CreateIssueDialog({
     const onSubmit = (e: FormEvent) => {
         e.preventDefault()
         if (!form.subject.trim()) return
-        const { subject, assignees, ...rest } = form
+        const { subject, assignees, task, ...rest } = form
         // Only send what was filled in; the server defaults customer/company from the project.
         const fields = Object.fromEntries(
             Object.entries(rest).filter(([, v]) => v !== ""),
@@ -95,6 +100,7 @@ export default function CreateIssueDialog({
             subject: subject.trim(),
             fields: { ...fields, description: form.description.trim() || undefined },
             assign_to: assignees.length ? assignees : undefined,
+            task: task || undefined,
         })
             .then(() => {
                 onCreated()
@@ -228,6 +234,16 @@ export default function CreateIssueDialog({
                                 />
                             </Field>
                         </div>
+
+                        <Field label={_("Task")}>
+                            <LinkFieldCombobox
+                                doctype="Task"
+                                filters={[["project", "=", project], ["issue", "=", ""]]}
+                                value={form.task}
+                                onChange={(v) => set("task", v)}
+                                clearable
+                            />
+                        </Field>
 
                         <Field label={_("Details")} htmlFor="issue-description">
                             <Textarea

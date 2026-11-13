@@ -29,8 +29,8 @@ export type TaskDetail = TaskCardData & {
     suggestions_available: boolean; handoff: { summary: string; checks: string; reviewer: string; requested_by: string; requested_on: string; evidence: TaskFile[] } | null
     time_log: TaskTimeLog | null
 }
-export type TaskTimeEntry = { name: string; parent: string; owner: string; from_time: string; hours: number; activity_type: string | null; description: string | null }
-export type TaskTimeLog = { entries: TaskTimeEntry[]; timer: { task: string; started_at: string; subject: string } | null; server_now: string; can_log: boolean; activity_types: string[] }
+export type TaskTimeEntry = { name: string; parent: string; owner: string; user: string; modified: string | null; from_time: string; hours: number; activity_type: string | null; description: string | null; is_billable: number; sales_invoice: string | null; can_edit: boolean }
+export type TaskTimeLog = { entries: TaskTimeEntry[]; timer: { task: string; started_at: string; subject: string } | null; server_now: string; can_log: boolean; can_log_for_others: boolean; activity_types: string[] }
 export function formatHours(hours: number): string {
     return `${Math.round(hours * 100) / 100}h`
 }

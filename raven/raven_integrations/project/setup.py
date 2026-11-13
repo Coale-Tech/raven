@@ -10,6 +10,31 @@ def add_dev_task_type() -> None:
 		frappe.get_doc({"doctype": "Task Type", "__newname": "Development"}).insert(ignore_permissions=True)
 
 
+SOFTWARE_DEVELOPMENT_TASKS = (
+	("Requirements and design", 0, 3),
+	("Development", 3, 10),
+	("Testing and review", 13, 4),
+	("Release", 17, 1),
+)
+
+
+def add_software_development_template() -> None:
+	"""Seed a "Software Development" Project Template (Development-type tasks) only on a site with no template at all,
+	so a site that deleted or never wanted it is not re-seeded after it has made its own. Idempotent; runs on every migrate."""
+	if frappe.db.count("Project Template"):
+		return
+	add_dev_task_type()
+	tasks = [
+		frappe.get_doc(
+			{"doctype": "Task", "subject": subject, "is_template": 1, "status": "Template", "type": "Development", "start": start, "duration": duration}
+		).insert(ignore_permissions=True)
+		for subject, start, duration in SOFTWARE_DEVELOPMENT_TASKS
+	]
+	frappe.get_doc(
+		{"doctype": "Project Template", "__newname": "Software Development", "tasks": [{"task": task.name} for task in tasks]}
+	).insert(ignore_permissions=True)
+
+
 def add_task_customer_facing_field() -> None:
 	"""The marker that enables "Send to customer" on a Task. Idempotent; also runs on every migrate."""
 	create_custom_fields(

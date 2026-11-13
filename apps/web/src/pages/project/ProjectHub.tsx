@@ -4,6 +4,7 @@ import { useFrappeGetCall } from "frappe-react-sdk"
 import { useAtom } from "jotai"
 import {
     ArrowUpRight,
+    CalendarRange,
     ChevronLeft,
     CircleAlert,
     Files,
@@ -16,6 +17,7 @@ import {
     NotepadText,
     PanelRight,
     Receipt,
+    Users,
     type LucideIcon,
 } from "lucide-react"
 import { PageHeader } from "@components/layout/PageHeader"
@@ -30,6 +32,8 @@ import ProjectSidePanelContent from "@components/features/project/ProjectSidePan
 import ChannelTab from "@components/features/project/tabs/ChannelTab"
 import OverviewTab from "@components/features/project/tabs/OverviewTab"
 import TasksTab from "@components/features/project/tabs/TasksTab"
+import TimelineTab from "@components/features/project/tabs/TimelineTab"
+import WorkloadTab from "@components/features/project/tabs/WorkloadTab"
 import NotesTab from "@components/features/project/tabs/NotesTab"
 import CommunicationTab from "@components/features/project/tabs/CommunicationTab"
 import GitHubTab from "@components/features/project/tabs/GitHubTab"
@@ -56,7 +60,7 @@ export type ProjectSummary = {
     channel: string | null
 }
 
-type TabKey = "channel" | "overview" | "tasks" | "inbox" | "notes" | "communication" | "github" | "billing" | "issues" | "documents"
+type TabKey = "channel" | "overview" | "tasks" | "timeline" | "workload" | "inbox" | "notes" | "communication" | "github" | "billing" | "issues" | "documents"
 
 const LAST_TAB_KEY = "ravenLastProjectTab"
 
@@ -87,6 +91,8 @@ const TABS: {
         panel: TasksTab,
         contentClassName: "flex flex-1 min-h-0 flex-col overflow-hidden p-5",
     },
+    { key: "timeline", label: "Timeline", icon: CalendarRange, panel: TimelineTab, contentClassName: "flex flex-1 min-h-0 flex-col overflow-hidden p-5" },
+    { key: "workload", label: "Workload", icon: Users, panel: WorkloadTab },
     { key: "inbox", label: "Inbox", icon: Inbox, panel: SuggestionsTab },
     { key: "notes", label: "Notes", icon: NotepadText, panel: NotesTab },
     { key: "communication", label: "Communication", icon: Mail, panel: CommunicationTab },

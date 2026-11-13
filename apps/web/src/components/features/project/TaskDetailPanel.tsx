@@ -9,6 +9,7 @@ import { Spinner } from "@components/ui/spinner"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@components/ui/tabs"
 import { Textarea } from "@components/ui/textarea"
 import CreateTaskDialog from "./tabs/CreateTaskDialog"
+import CreateIssueDialog from "./tabs/CreateIssueDialog"
 import TaskActions, { TaskAssignmentDialog, type TaskMutation } from "./TaskActions"
 import TaskFileQueue, { useTaskFileQueue } from "./TaskFileQueue"
 import TaskSubtasks from "./TaskSubtasks"
@@ -51,6 +52,7 @@ function PanelBody({ task, busy, errorMessage, onOpen, onChanged, onAction, onSe
                 <section><h3 className="font-medium">{_("Dependencies")}</h3><p className="text-ink-gray-5">{task.dependency_summary.ready ? _("Ready — prerequisites satisfied and no explicit blocker") : _("Not ready — resolve blockers or unfinished prerequisites")}</p>{task.dependency_summary.restricted && <p>{_("Some prerequisite details are restricted")}</p>}<TaskRelations key={`dependencies:${task.modified}`} task={task} kind="dependencies" initial={task.dependencies} onOpen={onOpen} /></section>
                 <section><div className="flex items-center justify-between gap-2"><h3 className="font-medium">{_("Subtasks")}: {task.child_counts.completed}/{task.child_counts.total} {_("completed")}</h3>{task.permissions.create_subtask && task.is_group ? <Button variant="outline" size="sm" onClick={() => setAddChild(true)}>{_("Add subtask")}</Button> : null}</div>{task.child_counts.cancelled > 0 && <p>{task.child_counts.cancelled} {_("cancelled")}</p>}<TaskRelations key={`children:${task.modified}`} task={task} kind="children" initial={task.children} onOpen={onOpen} /></section>
                 {task.suggestions_available && !["Completed", "Cancelled"].includes(task.status) && <Button variant="outline" onClick={() => setSubtasks(true)}>{_("Suggest subtasks")}</Button>}
+                <TaskIssues task={task} onChanged={onChanged} />
                 <section className="rounded border border-outline-gray-2 p-3"><h3 className="mb-2 font-medium">{_("Review handoff")}</h3>{task.handoff ? <div className="flex flex-col gap-2"><p>{_("Reviewer")}: {task.handoff.reviewer}</p><p className="whitespace-pre-wrap">{task.handoff.summary}</p><h4 className="font-medium">{_("What to check")}</h4><p className="whitespace-pre-wrap">{task.handoff.checks}</p><p className="text-xs text-ink-gray-5">{task.handoff.requested_by} · {task.handoff.requested_on}</p>{task.handoff.evidence.map(file => <a className="text-ink-blue-3 underline" key={file.name} href={file.file_url} target="_blank" rel="noreferrer">{file.file_name}</a>)}</div> : <p className="text-ink-gray-5">{_("No handoff recorded")}</p>}</section>
                 <a href={`/app/task/${encodeURIComponent(task.name)}`} target="_blank" rel="noreferrer" className="text-ink-blue-3 underline">{_("Open in Desk for Workflow and advanced operations")}</a>
                 {task.repeat && <p>{_("Repeats {0}", [_(task.repeat.frequency)])}{task.repeat.status !== "Active" && ` · ${_(task.repeat.status)}`} · <a href={`/app/auto-repeat/${encodeURIComponent(task.repeat.name)}`} target="_blank" rel="noreferrer" className="text-ink-blue-3 underline">{_("Open Auto Repeat")}</a></p>}
@@ -65,6 +67,20 @@ function PanelBody({ task, busy, errorMessage, onOpen, onChanged, onAction, onSe
         {subtasks && <TaskSubtasks task={task} onClose={() => setSubtasks(false)} onSaved={onChanged} />}
         {addChild && <CreateTaskDialog project={task.project} parentTask={task.name} uploadPolicy={{ ...task.upload_policy, remaining: task.upload_policy.max_attachments }} open onOpenChange={setAddChild} onSaved={onChanged} />}
     </>
+}
+
+type TaskIssue = { name: string; subject: string; status: string }
+
+/** Issue linked to the task through Task.issue; "New issue" pre-selects this task in the issue dialog. */
+function TaskIssues({ task, onChanged }: { task: TaskDetail; onChanged: () => void }) {
+    const { data, mutate } = useFrappeGetCall<{ message: TaskIssue[] }>("raven.api.project_issues.get_task_issues", { task: task.name }, ["task_issues", task.project, task.name])
+    const { data: options } = useFrappeGetCall<{ message: { can_create: boolean; priorities: string[]; issue_types: string[] } }>("raven.api.project_tabs.get_issue_options", { project: task.project }, ["project_issue_options", task.project])
+    const [creating, setCreating] = useState(false)
+    const issues = data?.message ?? []
+    return <section><div className="flex items-center justify-between gap-2"><h3 className="font-medium">{_("Issues")}</h3>{!issues.length && task.permissions.write && options?.message.can_create && <Button variant="outline" size="sm" onClick={() => setCreating(true)}>{_("New issue")}</Button>}</div>
+        {issues.length ? <ul>{issues.map(issue => <li key={issue.name}><a className="text-ink-blue-3 underline" href={`/app/issue/${encodeURIComponent(issue.name)}`} target="_blank" rel="noreferrer">{issue.subject}</a> · {_(issue.status)}</li>)}</ul> : <p className="text-ink-gray-5">{_("No linked issues")}</p>}
+        {creating && options && <CreateIssueDialog project={task.project} priorities={options.message.priorities} issueTypes={options.message.issue_types} defaultTask={task.name} open onOpenChange={open => !open && setCreating(false)} onCreated={() => { void mutate(); onChanged() }} />}
+    </section>
 }
 
 function TaskRelations({ task, kind, initial, onOpen }: { task: TaskDetail; kind: string; initial: Collection<TaskCardData>; onOpen: (name: string) => void }) {

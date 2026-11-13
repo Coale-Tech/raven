@@ -37,6 +37,7 @@ export default function CreateProjectDialog({
     const [customer, setCustomer] = useState("")
     const [endDate, setEndDate] = useState("")
     const [projectType, setProjectType] = useState("")
+    const [projectTemplate, setProjectTemplate] = useState("")
 
     const resetForm = () => {
         setProjectName("")
@@ -44,6 +45,7 @@ export default function CreateProjectDialog({
         setCustomer("")
         setEndDate("")
         setProjectType("")
+        setProjectTemplate("")
         reset()
     }
 
@@ -61,6 +63,7 @@ export default function CreateProjectDialog({
             customer: customer || undefined,
             expected_end_date: endDate || undefined,
             project_type: projectType || undefined,
+            project_template: projectTemplate || undefined,
         })
             .then((res) => {
                 onCreated(res.message)
@@ -104,6 +107,11 @@ export default function CreateProjectDialog({
                     <div className="flex flex-col gap-1.5">
                         <Label>{_("Project type")}</Label>
                         <LinkFieldCombobox doctype="Project Type" value={projectType} onChange={setProjectType} clearable />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <Label>{_("Template")}</Label>
+                        <LinkFieldCombobox doctype="Project Template" filters={[["disabled", "=", 0]]} value={projectTemplate} onChange={setProjectTemplate} clearable />
                     </div>
 
                     <div className="flex flex-col gap-1.5">

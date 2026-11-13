@@ -6,7 +6,7 @@ from frappe.utils.html_utils import clean_html
 from raven.raven_integrations.project.github import fetch_changelog
 from raven.raven_integrations.project.drive import folder_for_project
 
-from raven.raven_integrations.project import task_activity, task_board, task_time, tasks as task_service
+from raven.raven_integrations.project import issue_links, task_activity, task_board, task_time, tasks as task_service
 TASK_CREATE_FIELDS = (
 	"status",
 	"priority",
@@ -130,8 +130,8 @@ def task_action(task: str, action: str, expected_modified: str, payload: dict | 
 
 
 @frappe.whitelist(methods=["POST"])
-def log_task_time(task: str, started_at: str, hours: float, activity_type: str | None = None, description: str | None = None) -> None:
-	task_time.log_time(task, started_at, hours, activity_type, description)
+def log_task_time(task: str, started_at: str, hours: float, activity_type: str | None = None, description: str | None = None, for_user: str | None = None, is_billable: bool = False) -> None:
+	task_time.log_time(task, started_at, hours, activity_type, description, for_user, is_billable)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -140,8 +140,18 @@ def start_task_timer(task: str) -> None:
 
 
 @frappe.whitelist(methods=["POST"])
-def stop_task_timer(task: str, discard: bool = False, activity_type: str | None = None, description: str | None = None) -> None:
-	task_time.stop_timer(task, discard, activity_type, description)
+def stop_task_timer(task: str, discard: bool = False, activity_type: str | None = None, description: str | None = None, is_billable: bool = False) -> None:
+	task_time.stop_timer(task, discard, activity_type, description, is_billable)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_time_entry(entry: str, expected_modified: str, hours: float | None = None, started_at: str | None = None, activity_type: str | None = None, description: str | None = None, is_billable: bool | None = None) -> None:
+	task_time.update_entry(entry, expected_modified, hours, started_at, activity_type, description, is_billable)
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_time_entry(entry: str, expected_modified: str) -> None:
+	task_time.delete_entry(entry, expected_modified)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -395,12 +405,14 @@ def get_billing(project: str) -> dict:
 @frappe.whitelist()
 def get_issues(project: str) -> list[dict]:
 	_check(project)
-	return frappe.get_list(
-		"Issue",
-		filters={"project": project},
-		fields=["name", "subject", "status", "priority", "opening_date", "raised_by"],
-		order_by="modified desc",
-		limit_page_length=100,
+	return issue_links.tasks_for_issues(
+		frappe.get_list(
+			"Issue",
+			filters={"project": project},
+			fields=["name", "subject", "status", "priority", "opening_date", "raised_by"],
+			order_by="modified desc",
+			limit_page_length=100,
+		)
 	)
 
 
@@ -420,8 +432,10 @@ def create_issue(
 	subject: str,
 	fields: dict | str | None = None,
 	assign_to: list | str | None = None,
+	task: str | None = None,
 ) -> str:
-	"""Create an Issue; `fields` is limited to ISSUE_CREATE_FIELDS, `assign_to` is a list of users (ToDo + notification)."""
+	"""Create an Issue; `fields` is limited to ISSUE_CREATE_FIELDS, `assign_to` is a list of users (ToDo + notification).
+	`task` (optional, a writable unlinked task of the project) gets its `issue` set to the new Issue."""
 	_check(project)
 	frappe.has_permission("Issue", "create", throw=True)
 	fields = frappe.parse_json(fields) or {}
@@ -432,11 +446,14 @@ def create_issue(
 	if fields.get("description"):
 		fields["description"] = frappe.utils.escape_html(fields["description"]).replace("\n", "<br>")
 	company, customer = frappe.db.get_value("Project", project, ["company", "customer"])
+	task_doc = issue_links.require_linkable_task(task, project) if task else None
 
 	doc = frappe.get_doc(
 		{"doctype": "Issue", "project": project, "subject": subject, "company": company, "customer": customer, **fields}
 	)
 	doc.insert()
+	if task_doc:
+		issue_links.link_task(task_doc, doc.name)
 
 	if users := frappe.parse_json(assign_to):
 		from frappe.desk.form.assign_to import add

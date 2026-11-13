@@ -1,9 +1,12 @@
+import { useFrappePostCall, useSWRConfig, type FrappeError } from "frappe-react-sdk"
+import { PlayIcon, SquareIcon } from "lucide-react"
 import { Badge } from "@components/ui/badge"
 import { Button } from "@components/ui/button"
+import { errorResponseToast } from "@components/ui/error-banner"
 import { Spinner } from "@components/ui/spinner"
 import { cn } from "@lib/utils"
 import TaskActions, { type TaskMutation } from "./TaskActions"
-import { formatHours, siteTimestamp, taskDue, type TaskCardData } from "./taskBoard"
+import { formatHours, isTaskCacheKey, siteTimestamp, taskDue, type TaskCardData } from "./taskBoard"
 import _ from "@lib/translate"
 
 export default function TaskCard({ task, serverNow, busy, error, onOpen, onAction, onAssign, onSend }: {
@@ -11,6 +14,11 @@ export default function TaskCard({ task, serverNow, busy, error, onOpen, onActio
     onAction: TaskMutation; onAssign: () => void; onSend: () => void
 }) {
     const due = taskDue(task, serverNow)
+    const { mutate } = useSWRConfig()
+    const timer = useFrappePostCall("raven.api.project_tabs." + (task.time?.running ? "stop_task_timer" : "start_task_timer"))
+    const toggleTimer = async () => {
+        try { await timer.call({ task: task.name }); await mutate(key => isTaskCacheKey(key, task.project)) } catch (error) { errorResponseToast(_("Could not change timer"), error as FrappeError) }
+    }
     const age = Math.max(0, Math.floor((siteTimestamp(serverNow) - siteTimestamp(task.creation)) / 86400000))
     const priorityClass = task.priority === "Urgent" ? "text-ink-red-4" : task.priority === "High" ? "text-ink-amber-4" : "text-ink-gray-5"
     const ageClass = age > 30 ? "text-ink-red-4" : age > 7 ? "text-ink-amber-4" : "text-ink-gray-5"
@@ -23,7 +31,8 @@ export default function TaskCard({ task, serverNow, busy, error, onOpen, onActio
             <div className="flex items-start gap-1"><button type="button" onClick={() => onOpen(task.name)} className="min-w-0 flex-1 break-words text-left text-sm font-medium text-ink-gray-9 hover:underline">{task.subject}</button><TaskActions task={task} busy={busy} onAction={onAction} onAssign={onAssign} onSend={onSend} /></div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-ink-gray-5"><span>{task.name}</span><span>{_("{0}d old", [String(Number.isFinite(age) ? age : 0)])}</span><span className={ageClass}>{_("{0}d old", [String(Number.isFinite(age) ? age : 0)])}</span>{task.priority !== "Medium" && <span className={priorityClass}>{priorityText}</span>}</div>
             {task.repeat && <div><Badge variant="subtle" theme={task.repeat.status === "Active" ? "blue" : "gray"} size="sm" title={task.repeat.name}>{_("Repeats {0}", [_(task.repeat.frequency)])}{task.repeat.status !== "Active" && ` · ${_(task.repeat.status)}`}</Badge></div>}
-            {task.time && <div><Badge variant="subtle" theme={task.time.running ? "green" : task.expected_time > 0 && task.time.logged > task.expected_time ? "red" : "gray"} size="sm" title={_("Time logged")}>{task.time.running && "● "}{formatHours(task.time.logged)}{task.expected_time > 0 && ` / ${formatHours(task.expected_time)}`}</Badge></div>}
+            {task.time && <div className="flex items-center gap-1"><Badge variant="subtle" theme={task.time.running ? "green" : task.expected_time > 0 && task.time.logged > task.expected_time ? "red" : "gray"} size="sm" title={_("Time logged")}>{task.time.running && "● "}{formatHours(task.time.logged)}{task.expected_time > 0 && ` / ${formatHours(task.expected_time)}`}</Badge>
+                <Button type="button" variant="ghost" size="sm" className="size-6 p-0" loading={timer.loading} disabled={busy || timer.loading} onClick={() => void toggleTimer()} aria-label={task.time.running ? _("Stop timer on {0}", [task.subject]) : _("Start timer on {0}", [task.subject])} title={task.time.running ? _("Stop timer and log time") : _("Start timer")}>{task.time.running ? <SquareIcon className="size-3" /> : <PlayIcon className="size-3" />}</Button></div>}
             {(task.exp_end_date || due === "overdue") && (
                 <p className={cn("text-xs", due === "overdue" ? "text-ink-red-4" : due === "soon" ? "text-ink-amber-4" : "text-ink-gray-6")}>
                     {dueText}{task.exp_end_date ? ` · ${task.exp_end_date.slice(0, 16)}` : ""}{priorityText}

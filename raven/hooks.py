@@ -108,6 +108,7 @@ after_migrate = [
 	"raven.raven_integrations.project.setup.add_task_context_fields",
 	"raven.raven_integrations.project.setup.enable_task_auto_repeat",
 	"raven.raven_integrations.project.setup.add_dev_task_type",
+	"raven.raven_integrations.project.setup.add_software_development_template",
 ]
 # after_sync = ""
 
@@ -216,6 +217,10 @@ scheduler_events = {
 	],
 	"daily": [
 		"raven.raven_integrations.project.digest.send_overdue_digest",
+		"raven.raven_integrations.project.digest.send_blocker_nudges",
+	],
+	"weekly": [
+		"raven.raven_integrations.project.digest.send_weekly_status_drafts",
 	],
 	"cron": {
 		# run every 5 minutes. Reminder and scheduled message times are aligned to this
